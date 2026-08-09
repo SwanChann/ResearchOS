@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 import subprocess
@@ -151,6 +152,7 @@ def test_remote_collect_registers_small_test_artifacts(rf_env, monkeypatch):
     artifacts = {
         "job.json": json.dumps(job).encode(),
         "events.jsonl": b'{"event":"PREFLIGHT"}\n{"event":"RUNNING"}\n{"event":"SUCCEEDED"}\n',
+        "remote_runner.py": b"print('TEST / MOCK runner')\n",
         "run.log": b"# TEST / MOCK\n",
         "environment.json": json.dumps({"python": "3.10", "platform": "fake", "host": "fake-server", "gpu": []}).encode(),
         "metrics.json": json.dumps({"score": 6, "fixture": "TEST / MOCK"}).encode(),
@@ -176,6 +178,8 @@ def test_remote_collect_registers_small_test_artifacts(rf_env, monkeypatch):
     assert (project.root / "runs" / run_id / "run.yaml").is_file()
     assert (project.root / "runs" / run_id / "events.jsonl").read_text(encoding="utf-8").count("\n") == 3
     assert record["artifacts"]["job_events"].endswith("events.jsonl")
+    assert record["artifacts"]["runner"].endswith("remote_runner.py")
+    assert record["artifacts"]["runner_sha256"] == hashlib.sha256(artifacts["remote_runner.py"]).hexdigest()
     assert project.experiments.get(experiment)["status"] == "PILOT"
     events = read_jsonl(project.root / "runs" / "registry.jsonl")
     assert events[-1]["event"] == "registered"

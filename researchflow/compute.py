@@ -589,7 +589,7 @@ def remote_collect(machine_name: str, project_id: str, run_id: str, *, dry_run: 
             "run_id": run_id,
             "state": status["state"],
             "dry_run": True,
-            "collect": ["job.json", "events.jsonl", "run.log", "environment.json", "metrics.json when present", "experiment-card.yaml"],
+            "collect": ["job.json", "events.jsonl", "remote_runner.py", "run.log", "environment.json", "metrics.json when present", "experiment-card.yaml"],
             "never_collect": ["datasets", "checkpoints", "videos", "remote worktree"],
         }
 
@@ -597,6 +597,7 @@ def remote_collect(machine_name: str, project_id: str, run_id: str, *, dry_run: 
     payloads: dict[str, bytes] = {
         "job.json": _read_remote_small(machine, f"{remote_root}/job.json"),
         "events.jsonl": _read_remote_small(machine, f"{remote_root}/events.jsonl"),
+        "remote_runner.py": _read_remote_small(machine, f"{remote_root}/remote_runner.py"),
         "run.log": _read_remote_small(machine, f"{remote_root}/run.log"),
         "environment.json": _read_remote_small(machine, f"{remote_root}/environment.json"),
         "experiment-card.yaml": _read_remote_small(machine, f"{remote_root}/experiment-card.yaml"),
@@ -643,6 +644,8 @@ def remote_collect(machine_name: str, project_id: str, run_id: str, *, dry_run: 
             "environment": final_paths["environment.json"],
             "job": final_paths["job.json"],
             "job_events": final_paths["events.jsonl"],
+            "runner": final_paths["remote_runner.py"],
+            "runner_sha256": hashlib.sha256(payloads["remote_runner.py"]).hexdigest(),
             "experiment_card": final_paths["experiment-card.yaml"],
             "supervisor": final_paths.get("supervisor.log"),
             "checkpoints": [], "figures": [], "trajectories": [], "videos": [],

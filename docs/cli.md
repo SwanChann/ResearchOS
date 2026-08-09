@@ -52,7 +52,7 @@ rf compute collect NAME RUN-000001 --project-id ID [--dry-run]
 
 `compute plan` is side-effect free. It shows the persistent remote repo/worktree/run layout and SSH steps; it never copies datasets, large checkpoints, or a whole repository.
 
-`compute submit` checks the experiment card and pinned commit, creates a detached worktree in the configured remote workspace, and starts a background runner. A full run still requires `approval.full=approved` and `--yes`. `compute job` reads the remote job record. `compute collect` accepts only a terminal job, copies bounded provenance artifacts (maximum 10 MiB each), writes a standard local `run.yaml`, appends the run/job registries, and advances the experiment state. Its `--dry-run` lists what would and would not be collected.
+`compute submit` checks the experiment card and pinned commit, creates a detached worktree in the configured remote workspace, and starts a background runner. A full run still requires `approval.full=approved` and `--yes`. `compute job` reads the remote job record. `compute collect` accepts only a terminal job, copies bounded provenance artifacts (maximum 10 MiB each), preserves the exact `remote_runner.py` with its SHA-256 in `run.yaml`, writes the standard local run record, appends the run/job registries, and advances the experiment state. Its `--dry-run` lists what would and would not be collected.
 
 Remote execution does not upload a repository, datasets, checkpoints, or videos. The server repository at `<workspace-root>/repos/<project-id>` must already contain the experiment commit. Job transitions are preserved in remote `events.jsonl`; repeated status checks may also append duplicate observed states to the coordinator ledger.
 
