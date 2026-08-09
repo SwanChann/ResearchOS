@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "researchflow"
+version = "0.1.0"
+description = "Local-first Research OS for AI-assisted scientific research"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0,<7",
+  "jsonschema>=4.20,<5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+rf = "researchflow.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["researchflow*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
