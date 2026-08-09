@@ -34,4 +34,17 @@ rf experiment approve EXP-0001 --level full --yes
 rf run show|logs|artifacts RUN-000001
 ```
 
-`compute` remains a stable top-level name; executable machine and lock actions are added by the remote-compute phase.
+Compute commands:
+
+```text
+rf compute add NAME --type local|ssh --workspace-root PATH [--host ALIAS]
+rf compute list
+rf compute probe NAME [--dry-run]
+rf compute status [NAME]
+rf compute jobs
+rf compute lock NAME --experiment EXP-0001 --job-id JOB-1
+rf compute unlock NAME [--force --yes]
+rf compute plan NAME --project-id ID --experiment EXP-ID --commit SHA --command CMD
+```
+
+`compute plan` is side-effect free. It shows the persistent remote repo/worktree/run layout and SSH steps; it never copies datasets, large checkpoints, or a whole repository.
