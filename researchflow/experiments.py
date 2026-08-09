@@ -12,7 +12,7 @@ from .errors import ResearchFlowError
 from .gitops import changed_paths, check_scope, commit_exists, create_worktree, dirty_paths, head, require_git_repo
 from .ids import allocate_id
 from .io import append_jsonl, read_jsonl, read_markdown_record, read_yaml, utc_now, write_yaml
-from .project import ResearchProject
+from .project import ResearchProject, update_current_state
 from .schema import validate_record
 
 TRANSITIONS = {
@@ -94,6 +94,9 @@ class ExperimentStore:
         validate_record("experiment", card)
         write_yaml(self.path(experiment_id), card)
         self._event(card, "created")
+        update_current_state(self.project, "Active Experiment", f"{experiment_id} · DRAFT")
+        update_current_state(self.project, "Current Stage", "Experiment card drafted; not approved for execution.")
+        update_current_state(self.project, "Next Action", f"Review evidence and advance {experiment_id} through explicit gates.")
         return experiment_id
 
     def _event(self, card: dict[str, Any], event: str, latest_run: str | None = None) -> None:
@@ -124,6 +127,9 @@ class ExperimentStore:
         validate_record("experiment", card)
         write_yaml(self.path(experiment_id), card)
         self._event(card, "transition")
+        update_current_state(self.project, "Active Experiment", f"{experiment_id} · {target}")
+        update_current_state(self.project, "Current Stage", f"Experiment {experiment_id} is {target}.")
+        update_current_state(self.project, "Next Action", f"Follow the allowed transition and preflight requirements for {experiment_id}.")
         return card
 
     def latest(self) -> dict[str, dict[str, Any]]:

@@ -1,0 +1,16 @@
+schema_version: 1
+permissions:
+  read: allow
+  search: allow
+  edit_experiment_worktree: allow
+  unit_test: allow
+  smoke_test: allow
+  experiment_commit: allow
+  pilot_gpu_run: configurable
+  full_gpu_run: human
+  merge_baseline: human
+  git_push: human
+  delete_dataset: deny
+  delete_checkpoint: deny
+  real_robot_execution: human
+  safety_critical_control_edit: human

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
+import shutil
+import sys
 from typing import Any
 
 from .config import load_config, research_home
@@ -13,7 +16,13 @@ WORKSPACE_DIRS = (
     "memory/observations", "memory/hypotheses", "memory/decisions",
     "evidence/papers/pdf", "evidence/papers/analysis",
     "evidence/repos/manifests", "evidence/repos/notes",
-    "experiments/cards", "experiments/reports", "runs", "notes/daily",
+    "experiments/cards", "experiments/reports", "runs", "notes/daily", "skills",
+)
+
+SKILL_NAMES = (
+    "retrieve-before-reason", "literature-query", "code-evidence-query",
+    "hypothesis-focus", "experiment-design", "experiment-review",
+    "experiment-run", "result-analysis", "daily-log",
 )
 
 KNOWLEDGE = """# Knowledge Index
@@ -52,7 +61,7 @@ At startup:
 
 1. Read this file, `KNOWLEDGE.md`, and `memory/current-state.md`.
 2. If code work is involved, inspect the configured research repository and its Git status.
-3. Classify the question and retrieve task-specific evidence; do not load all history.
+3. Read the relevant `skills/<name>/SKILL.md`, classify the question, and retrieve task-specific evidence; do not load all history.
 4. Separate verified literature/code, observations, experimental results, hypotheses, inference, and needs-verification.
 5. Create no scientific claim from model memory, smoke output, fixtures, or unregistered metrics.
 6. Before a run, validate the experiment card, approval, Git provenance, scope, budget, and stop conditions.
@@ -91,6 +100,41 @@ None recorded.
 Record the main research question and retrieve relevant evidence.
 """
 
+POLICY = {
+    "schema_version": 1,
+    "permissions": {
+        "read": "allow", "search": "allow", "edit_experiment_worktree": "allow",
+        "unit_test": "allow", "smoke_test": "allow", "experiment_commit": "allow",
+        "pilot_gpu_run": "configurable", "full_gpu_run": "human",
+        "merge_baseline": "human", "git_push": "human",
+        "delete_dataset": "deny", "delete_checkpoint": "deny",
+        "real_robot_execution": "human", "safety_critical_control_edit": "human",
+    },
+}
+
+
+def skill_source_dir() -> Path:
+    candidates = [Path(__file__).resolve().parent.parent / "skills", Path(sys.prefix) / "share" / "researchflow" / "skills"]
+    for candidate in candidates:
+        if all((candidate / name / "SKILL.md").is_file() for name in SKILL_NAMES):
+            return candidate
+    raise ResearchFlowError("Built-in ResearchFlow skills are missing. Reinstall the package.")
+
+
+def update_current_state(project: "ResearchProject", section: str, value: str) -> None:
+    path = project.root / "memory" / "current-state.md"
+    text = path.read_text(encoding="utf-8")
+    pattern = rf"(## {re.escape(section)}\n\n)(.*?)(?=\n\n## |\Z)"
+    updated, count = re.subn(pattern, lambda match: match.group(1) + value.strip(), text, count=1, flags=re.DOTALL)
+    if count != 1:
+        raise ResearchFlowError(f"Current-state section is missing: {section} ({path})")
+    atomic_text(path, updated.rstrip() + "\n")
+
+
+def parse_current_state(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    return {match.group(1): match.group(2).strip() for match in re.finditer(r"^## (.+?)\n\n(.*?)(?=\n\n## |\Z)", text, re.MULTILINE | re.DOTALL)}
+
 
 def project_path(project_id: str, config: dict[str, Any] | None = None) -> Path:
     return research_home(config) / ".projects" / project_id
@@ -122,6 +166,12 @@ def add_project(project_id: str, repo: Path, name: str | None = None, config: di
     atomic_text(workspace / "KNOWLEDGE.md", KNOWLEDGE)
     atomic_text(workspace / "memory" / "current-state.md", CURRENT_STATE)
     atomic_text(workspace / "memory" / "assumptions.md", "# Assumptions\n\nNo assumptions recorded.\n")
+    write_yaml(workspace / "policy.yaml", POLICY)
+    source_skills = skill_source_dir()
+    for skill in SKILL_NAMES:
+        target = workspace / "skills" / skill
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_skills / skill / "SKILL.md", target / "SKILL.md")
     for path in ("evidence/papers/index.jsonl", "experiments/registry.jsonl", "runs/registry.jsonl"):
         atomic_text(workspace / path, "")
     return workspace
@@ -153,8 +203,19 @@ class ResearchProject:
         return Path(self.data["repo"]["local"])
 
     def status(self) -> dict[str, Any]:
-        _, body = read_markdown_record(self.root / "memory" / "current-state.md") if (self.root / "memory" / "current-state.md").read_text(encoding="utf-8").startswith("---\n") else ({}, (self.root / "memory" / "current-state.md").read_text(encoding="utf-8"))
-        return {"id": self.data["id"], "name": self.data["name"], "repo": str(self.repo), "current_state": body.strip()}
+        from .io import read_jsonl
+        state = parse_current_state(self.root / "memory" / "current-state.md")
+        experiment_events = read_jsonl(self.root / "experiments" / "registry.jsonl")
+        run_events = [item for item in read_jsonl(self.root / "runs" / "registry.jsonl") if item.get("event") == "registered"]
+        decisions = sorted((self.root / "memory" / "decisions").glob("DEC-*.md"))
+        return {
+            "id": self.data["id"], "name": self.data["name"], "repo": str(self.repo),
+            "current_state": state,
+            "latest_experiment": experiment_events[-1] if experiment_events else None,
+            "last_result": run_events[-1] if run_events else None,
+            "latest_decision": decisions[-1].stem if decisions else None,
+            "next_action": state.get("Next Action"),
+        }
 
     @property
     def evidence(self):

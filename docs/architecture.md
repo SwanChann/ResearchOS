@@ -29,6 +29,23 @@ The functional core validates records, IDs, transitions, scope, and provenance. 
 
 Project files are authoritative. JSONL registries are append-friendly event/index layers; experiment cards and run records remain authoritative records.
 
+## Core repository
+
+```text
+researchflow/
+  researchflow/       compact Python package (CLI + functional modules)
+  schemas/            JSON record contracts
+  templates/          editable human-readable starting points
+  skills/             agent-agnostic workflow instructions
+  examples/
+    toy-research/      deterministic TEST/MOCK E2E fixture
+    embodied-nav/      domain profile examples, no claimed results
+  tests/               unit, safety, CLI, and E2E tests
+  docs/                contracts, workflow, ADRs, development
+```
+
+The Python package is deliberately flat. Modules correspond to stable nouns (`project`, `evidence`, `experiments`, `runs`, `compute`) or small infrastructure boundaries (`io`, `schema`, `gitops`).
+
 ## Safety boundaries
 
 - Formal runs are clean-commit-first by default.
@@ -41,4 +58,3 @@ Project files are authoritative. JSONL registries are append-friendly event/inde
 ## Deliberate omissions
 
 V0.1/V0.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, or real GPU invocation. Structured filtering, full-text search, and agent reranking are sufficient until measured retrieval needs justify more infrastructure.
-

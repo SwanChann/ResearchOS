@@ -1,4 +1,5 @@
 from researchflow.project import ResearchProject, add_project
+from researchflow.doctor import run_doctor
 
 
 def test_paper_and_repo_evidence_are_searchable(rf_env, tmp_path):
@@ -11,4 +12,5 @@ def test_paper_and_repo_evidence_are_searchable(rf_env, tmp_path):
     assert project.evidence.show(paper)["metadata"]["status"] == "unread"
     assert project.evidence.show(repo)["pin"]["commit"] == "abc123"
     assert {item["id"] for item in project.evidence.search("navigation")} == {paper, repo}
-
+    duplicate_check = next(check for check in run_doctor("toy") if check.name == "duplicate record IDs")
+    assert duplicate_check.ok, "paper PDF and analysis are one entity, not duplicate IDs"

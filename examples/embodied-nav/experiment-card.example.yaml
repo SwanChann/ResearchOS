@@ -1,0 +1,34 @@
+# EXAMPLE ONLY — contains no experimental result.
+id: EXP-0001
+title: Temporal context for delayed right turns
+status: DRAFT
+question: Does a bounded temporal context improve turning success without degrading collision rate?
+hypothesis: {id: HYP-0001}
+evidence:
+  papers: [PAPER-0001]
+  repos: [REPO-0001]
+  observations: [OBS-0001]
+baseline: {repo: /path/to/embodied-nav, commit: abc123, config: configs/baseline.yaml}
+change: {summary: Add one bounded temporal-context input while freezing evaluation and control.}
+scope:
+  allowed_paths: [src/navigation/, configs/temporal-context.yaml]
+  frozen_paths: [evaluation/, datasets/, src/control/]
+metrics:
+  primary: turning_success_rate
+  secondary: [success_rate, SPL]
+  guardrails:
+    collision_rate_max_increase_pp: 1
+    latency_max_increase_pct: 10
+    vram_max_gb: 22
+budget:
+  smoke: {max_runs: 1}
+  pilot: {max_runs: 3, max_gpu_hours: 1}
+  full: {max_runs: 10, max_gpu_hours: 8}
+stop_conditions: [loss_nan, oom_twice, pilot_below_baseline, collision_guardrail_violation]
+compute: {machine: server4090, gpu_count: 1}
+approval: {implementation: auto, pilot: human, full: human}
+run: {command: python train.py --config configs/temporal-context.yaml, required_tests: [python -m pytest]}
+experiment_commit: null
+test_only: false
+created: 2026-08-10T00:00:00+00:00
+updated: 2026-08-10T00:00:00+00:00

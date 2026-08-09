@@ -18,9 +18,9 @@ rf evidence search QUERY
 rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
-rf experiment new|show|transition|preflight|worktree|smoke|pilot|full
+rf experiment new|show|transition|approve|preflight|worktree|smoke|pilot|full
 rf run show|logs|artifacts
-rf compute add|list|probe|status|jobs|lock|unlock
+rf compute add|list|probe|status|jobs|lock|unlock|plan
 rf daily
 rf doctor
 ```
@@ -57,4 +57,3 @@ Each `skills/<name>/SKILL.md` declares purpose, required inputs/retrieval, prohi
 ## No duplicate interfaces
 
 `memory observation add` and `memory decision add` remain grouped instead of adding `observe`/`decide` aliases. State changes use one `experiment transition` primitive; `smoke`, `pilot`, and `full` are execution commands with gate checks, not aliases for arbitrary transitions.
-

@@ -72,3 +72,6 @@ def test_complete_toy_research_loop_is_reproducible(rf_env):
     assert full["git"]["commit"] == project.experiments.get(experiment)["experiment_commit"]
     assert full["test_only"] is True
     assert (project.root / "memory" / "decisions" / f"{decision}.md").is_file()
+    status = project.status()
+    assert status["latest_experiment"]["status"] == "ACCEPTED"
+    assert status["latest_decision"] == decision

@@ -17,7 +17,7 @@ from .experiments import ExperimentStore, experiment_repo, preflight
 from .gitops import branch, diff_hash, dirty_paths, head
 from .ids import allocate_id
 from .io import append_jsonl, atomic_text, read_jsonl, read_yaml, utc_now, write_yaml
-from .project import ResearchProject
+from .project import ResearchProject, update_current_state
 from .schema import validate_record
 
 
@@ -112,6 +112,8 @@ def execute_local_run(project: ResearchProject, experiment_id: str, level: str, 
     write_yaml(root / "run.yaml", record)
     append_jsonl(project.root / "runs" / "registry.jsonl", {"event": "registered", "id": run_id, "experiment": experiment_id, "level": level, "status": record["status"], "at": record["ended_at"], "test_only": card["test_only"]})
     store._event(card, "run_registered", latest_run=run_id)
+    update_current_state(project, "Current Stage", f"Run {run_id} registered as {record['status']} ({level}).")
+    update_current_state(project, "Next Action", f"Inspect {run_id} raw metrics, guardrails, failures, and uncertainty before recording an observation.")
     return record
 
 

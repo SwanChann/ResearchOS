@@ -1,0 +1,38 @@
+id: EXP-0001
+title: Replace with a bounded experiment title
+status: DRAFT
+question: Replace with one answerable question
+hypothesis:
+  id: HYP-0001
+evidence:
+  papers: []
+  repos: []
+  observations: [OBS-0001]
+baseline:
+  repo: /path/to/research-repo
+  commit: abc123
+  config: configs/baseline.yaml
+change:
+  summary: One isolated change
+scope:
+  allowed_paths: [src/component/]
+  frozen_paths: [evaluation/, datasets/]
+metrics:
+  primary: primary_metric
+  secondary: [secondary_metric]
+  guardrails:
+    latency_max_increase_pct: 10
+budget:
+  smoke: {max_runs: 1}
+  pilot: {max_runs: 3}
+  full: {max_runs: 10, max_gpu_hours: 8}
+stop_conditions: [nonzero_exit, loss_nan, max_runs]
+compute: {machine: local, gpu_count: 0}
+approval: {implementation: auto, pilot: auto, full: human}
+run:
+  command: python run_experiment.py
+  required_tests: [python -m pytest]
+experiment_commit: null
+test_only: false
+created: replace-with-ISO-time
+updated: replace-with-ISO-time

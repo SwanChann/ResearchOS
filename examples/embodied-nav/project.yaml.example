@@ -1,0 +1,11 @@
+schema_version: 1
+id: embodied-nav
+name: Embodied Navigation
+repo:
+  local: /path/to/embodied-nav
+compute:
+  default_machine: server4090
+paths:
+  dataset_root: /data/embodied-nav
+  checkpoint_root: /data/checkpoints
+created: 2026-08-10T00:00:00+00:00
