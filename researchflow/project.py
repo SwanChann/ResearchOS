@@ -160,3 +160,8 @@ class ResearchProject:
     def evidence(self):
         from .evidence import EvidenceStore
         return EvidenceStore(self)
+
+    @property
+    def experiments(self):
+        from .experiments import ExperimentStore
+        return ExperimentStore(self)

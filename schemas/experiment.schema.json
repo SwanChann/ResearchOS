@@ -5,7 +5,7 @@
   "properties": {
     "id": {"type": "string", "pattern": "^EXP-[0-9]{4}$"},
     "title": {"type": "string", "minLength": 1},
-    "status": {"type": "string"},
+    "status": {"enum": ["DRAFT", "EVIDENCE_READY", "HYPOTHESIS_APPROVED", "IMPLEMENTED", "SMOKE_TEST", "FAILED_SMOKE", "PILOT", "ANALYZE_FAILURE", "PILOT_PASS", "FULL_APPROVED", "FULL_RUN", "ANALYZED", "DECIDED", "ACCEPTED", "REJECTED", "INCONCLUSIVE", "FOLLOW_UP"]},
     "question": {"type": "string", "minLength": 1},
     "hypothesis": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string", "pattern": "^HYP-[0-9]{4}$"}}, "additionalProperties": false},
     "evidence": {"type": "object"},
