@@ -53,8 +53,9 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 - Research lifecycle and compute-job lifecycle are separate.
 - Heavy jobs require a single-GPU lock; stale locks are detectable, not silently removed.
 - Remote operations and artifact collection support dry-run.
+- Remote jobs use an atomic lock directory on the server and append-only state events; this is cooperative coordination, not an operating-system GPU reservation.
 - Secrets stay in environment variables, SSH configuration, or credential stores.
 
 ## Deliberate omissions
 
-V0.1/V0.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, or real GPU invocation. Structured filtering, full-text search, and agent reranking are sufficient until measured retrieval needs justify more infrastructure.
+V0.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Structured filtering, full-text search, and agent reranking are sufficient until measured retrieval needs justify more infrastructure.

@@ -32,6 +32,18 @@ rf run          provenance, logs, metrics, artifacts
 rf doctor       config, schemas, tools, paths, references, IDs, machines
 ```
 
+For a configured SSH target, the bounded remote lifecycle is:
+
+```powershell
+rf compute submit server4090 --project-id my-project --experiment EXP-0001 --level smoke --dry-run
+rf compute submit server4090 --project-id my-project --experiment EXP-0001 --level smoke
+rf compute job server4090 RUN-000001
+rf compute collect server4090 RUN-000001 --project-id my-project --dry-run
+rf compute collect server4090 RUN-000001 --project-id my-project
+```
+
+The server must already contain the project repository at `<workspace-root>/repos/<project-id>` and the pinned commit must be available there. ResearchFlow creates a detached worktree, launches the approved command in the background, records an append-only job event ledger, and collects only bounded text/JSON provenance artifacts.
+
 ## Where files live
 
 ```text
@@ -114,10 +126,11 @@ python -m pytest tests/test_e2e_toy.py -q
 
 ## Current limitations
 
-- SSH machine probing and remote execution plans exist, but no real server/GPU was used in validation. The coordinator lock does not yet protect against unrelated tools or another client that ignores ResearchFlow.
-- Remote submit/collect/register execution is not enabled; V0.1 executes runs locally and keeps SSH plans side-effect free.
+- SSH submit/status/collect/register has been validated against a real server with a deterministic `TEST / MOCK`, CPU-only fixture. This proves the remote workflow and provenance path, not GPU scheduling quality or any scientific result.
+- A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
+- Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
 - Literature analysis is deliberately manual/agent-assisted; no PDF parser, citation engine, embeddings, or vector database is included.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
-- There is no GUI, cloud sync, scheduler daemon, or automatic merge/push.
+- There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 
-The recommended next milestone is a fake-SSH integration harness plus a server-side atomic GPU lock and small-artifact collect/register protocol. It closes the largest unverified safety/provenance gap without adding a GUI or database.
+The recommended next milestone is explicit remote cancellation and retention/cleanup policy, followed by packaging the CLI for ordinary local installation. These close operational gaps without changing the file-first architecture.

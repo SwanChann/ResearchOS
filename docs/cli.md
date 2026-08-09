@@ -21,7 +21,7 @@ rf daily
 rf doctor
 ```
 
-Experiment and local-run commands:
+Experiment and run commands:
 
 ```text
 rf experiment new --hypothesis HYP-0001 --title ... --question ...
@@ -45,8 +45,15 @@ rf compute jobs
 rf compute lock NAME --experiment EXP-0001 --job-id JOB-1
 rf compute unlock NAME [--force --yes]
 rf compute plan NAME --project-id ID --experiment EXP-ID --commit SHA --command CMD
+rf compute submit NAME --project-id ID --experiment EXP-ID [--level smoke|pilot|full] [--dry-run] [--yes]
+rf compute job NAME RUN-000001
+rf compute collect NAME RUN-000001 --project-id ID [--dry-run]
 ```
 
 `compute plan` is side-effect free. It shows the persistent remote repo/worktree/run layout and SSH steps; it never copies datasets, large checkpoints, or a whole repository.
+
+`compute submit` checks the experiment card and pinned commit, creates a detached worktree in the configured remote workspace, and starts a background runner. A full run still requires `approval.full=approved` and `--yes`. `compute job` reads the remote job record. `compute collect` accepts only a terminal job, copies bounded provenance artifacts (maximum 10 MiB each), writes a standard local `run.yaml`, appends the run/job registries, and advances the experiment state. Its `--dry-run` lists what would and would not be collected.
+
+Remote execution does not upload a repository, datasets, checkpoints, or videos. The server repository at `<workspace-root>/repos/<project-id>` must already contain the experiment commit. Job transitions are preserved in remote `events.jsonl`; repeated status checks may also append duplicate observed states to the coordinator ledger.
 
 Compute commands do not require a default research project. A live `compute probe` returns a non-zero exit code when the target is unreachable; `--dry-run` remains successful without opening a connection.

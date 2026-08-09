@@ -29,11 +29,13 @@ QUEUED -> PREFLIGHT -> GPU_WAIT -> RUNNING
        -> COLLECTED -> REGISTERED
 ```
 
-The local runner currently performs the same gates synchronously and registers every attempted run. A successful process without a valid `metrics.json` is recorded as failed because result collection is incomplete.
+The local runner performs this lifecycle synchronously and registers every attempted run. The SSH runner starts in the background, persists its current state in `job.json`, and appends transitions to `events.jsonl`; `compute collect` registers a terminal job locally. A successful process without a valid JSON-object `metrics.json` is recorded as failed because result collection is incomplete.
 
 ## Run provenance
 
-Every run directory contains `run.yaml`, `run.log`, `metrics.json`, and `environment.json`. The run record links its experiment, level, command, exact commit, dirty flag/diff hash, configuration hash, environment, host/GPU request, metrics, artifacts, timestamps, and exit code. Fixture runs carry `test_only: true` and visible `TEST / MOCK` labels.
+Every successful run directory contains `run.yaml`, `run.log`, `metrics.json`, and `environment.json`. Remote runs additionally retain `job.json`, `events.jsonl`, the submitted experiment card, and supervisor output when present. The run record links its experiment, level, command, exact commit, dirty flag/diff hash, configuration hash, environment, host/GPU request, metrics, artifacts, timestamps, and exit code. Fixture runs carry `test_only: true` and visible `TEST / MOCK` labels.
+
+Remote collection is intentionally narrow: only small text/JSON/YAML provenance files are copied, with a 10 MiB limit per file. Datasets, checkpoints, videos, and remote worktrees remain on the server.
 
 ## Git-first boundary
 

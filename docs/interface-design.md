@@ -20,12 +20,12 @@ rf memory decision add|show
 rf hypothesis new|show
 rf experiment new|show|transition|approve|preflight|worktree|smoke|pilot|full
 rf run show|logs|artifacts
-rf compute add|list|probe|status|jobs|lock|unlock|plan
+rf compute add|list|probe|status|jobs|lock|unlock|plan|submit|job|collect
 rf daily
 rf doctor
 ```
 
-Commands that create worktrees, execute runs, collect artifacts, touch remote machines, or unlock compute expose `--dry-run` where meaningful. Full runs and force-unlock require explicit confirmation flags.
+Commands that create worktrees, execute runs, collect artifacts, touch remote machines, or unlock compute expose `--dry-run` where meaningful. Remote submit creates a detached worktree from a pinned commit; remote collect registers only bounded provenance artifacts. Full runs and force-unlock require explicit confirmation flags.
 
 ## Python API
 
