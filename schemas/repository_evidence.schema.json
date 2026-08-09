@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "source", "pin", "retrieved_at", "related_papers", "important_paths", "tags", "notes"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^REPO-[0-9]{4}$"},
+    "name": {"type": "string", "minLength": 1},
+    "source": {"type": "object", "required": ["url", "local"], "properties": {"url": {"type": ["string", "null"]}, "local": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "pin": {"type": "object", "required": ["commit"], "properties": {"commit": {"type": "string", "minLength": 1}}, "additionalProperties": false},
+    "retrieved_at": {"type": "string"},
+    "related_papers": {"type": "array", "items": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"}},
+    "important_paths": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}

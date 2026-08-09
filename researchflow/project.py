@@ -156,3 +156,7 @@ class ResearchProject:
         _, body = read_markdown_record(self.root / "memory" / "current-state.md") if (self.root / "memory" / "current-state.md").read_text(encoding="utf-8").startswith("---\n") else ({}, (self.root / "memory" / "current-state.md").read_text(encoding="utf-8"))
         return {"id": self.data["id"], "name": self.data["name"], "repo": str(self.repo), "current_state": body.strip()}
 
+    @property
+    def evidence(self):
+        from .evidence import EvidenceStore
+        return EvidenceStore(self)
