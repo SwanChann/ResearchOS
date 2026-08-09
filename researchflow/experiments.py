@@ -26,7 +26,7 @@ TRANSITIONS = {
     "ANALYZE_FAILURE": {"IMPLEMENTED", "ANALYZED"},
     "PILOT_PASS": {"FULL_APPROVED"},
     "FULL_APPROVED": {"FULL_RUN"},
-    "FULL_RUN": {"ANALYZED"},
+    "FULL_RUN": {"ANALYZED", "ANALYZE_FAILURE"},
     "ANALYZED": {"DECIDED"},
     "DECIDED": {"ACCEPTED", "REJECTED", "INCONCLUSIVE", "FOLLOW_UP"},
     "ACCEPTED": set(), "REJECTED": set(), "INCONCLUSIVE": set(), "FOLLOW_UP": set(),
@@ -64,7 +64,7 @@ class ExperimentStore:
         validate_record("experiment", card)
         return card
 
-    def create(self, hypothesis: str, title: str, question: str, command: str, allowed_paths: list[str], frozen_paths: list[str], primary: str, secondary: list[str], guardrails: dict[str, Any], stop_conditions: list[str], config_path: str | None = None) -> str:
+    def create(self, hypothesis: str, title: str, question: str, command: str, allowed_paths: list[str], frozen_paths: list[str], primary: str, secondary: list[str], guardrails: dict[str, Any], stop_conditions: list[str], config_path: str | None = None, test_only: bool = False) -> str:
         hypothesis_path = self.project.root / "memory" / "hypotheses" / f"{hypothesis}.md"
         if not hypothesis_path.exists():
             raise ResearchFlowError(f"Hypothesis does not exist: {hypothesis}")
@@ -89,7 +89,7 @@ class ExperimentStore:
             "compute": {"machine": "local", "gpu_count": 0},
             "approval": {"implementation": "auto", "pilot": "auto", "full": "human"},
             "run": {"command": command, "required_tests": []},
-            "experiment_commit": None, "created": now, "updated": now,
+            "experiment_commit": None, "test_only": test_only, "created": now, "updated": now,
         }
         validate_record("experiment", card)
         write_yaml(self.path(experiment_id), card)
@@ -191,11 +191,16 @@ def add_experiment_parser(commands) -> None:
     new.add_argument("--guardrails", required=True, help="JSON object, e.g. {\"latency_pct\":10}")
     new.add_argument("--stop-conditions", required=True)
     new.add_argument("--config")
+    new.add_argument("--test-only", action="store_true", help="mark a fixture/pipeline test; never scientific evidence")
     show = actions.add_parser("show")
     show.add_argument("id")
     transition = actions.add_parser("transition")
     transition.add_argument("id")
     transition.add_argument("state")
+    approve = actions.add_parser("approve")
+    approve.add_argument("id")
+    approve.add_argument("--level", choices=("full",), required=True)
+    approve.add_argument("--yes", action="store_true", required=True)
     worktree = actions.add_parser("worktree")
     worktree.add_argument("id")
     worktree.add_argument("--dry-run", action="store_true")
@@ -221,11 +226,23 @@ def execute_experiment_command(project: ResearchProject, args: argparse.Namespac
             raise ResearchFlowError(f"--guardrails must be a JSON object: {exc.msg}") from exc
         if not isinstance(guardrails, dict):
             raise ResearchFlowError("--guardrails must be a JSON object.")
-        print(store.create(args.hypothesis, args.title, args.question, args.command, csv(args.allowed_paths), csv(args.frozen_paths), args.primary, csv(args.secondary), guardrails, csv(args.stop_conditions), args.config))
+        print(store.create(args.hypothesis, args.title, args.question, args.command, csv(args.allowed_paths), csv(args.frozen_paths), args.primary, csv(args.secondary), guardrails, csv(args.stop_conditions), args.config, args.test_only))
     elif args.action == "show":
         dump(store.get(args.id))
     elif args.action == "transition":
         dump(store.transition(args.id, args.state))
+    elif args.action == "approve":
+        card = store.get(args.id)
+        if not args.yes:
+            raise ResearchFlowError("Full approval requires explicit --yes confirmation.")
+        card["approval"][args.level] = "approved"
+        card["updated"] = utc_now()
+        validate_record("experiment", card)
+        write_yaml(store.path(args.id), card)
+        store._event(card, f"approve_{args.level}")
+        if args.level == "full" and card["status"] == "PILOT_PASS":
+            card = store.transition(args.id, "FULL_APPROVED")
+        dump(card)
     elif args.action == "worktree":
         card = store.get(args.id)
         print(create_worktree(project.repo, worktree_path(project, args.id), card["baseline"]["commit"], args.dry_run))

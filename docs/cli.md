@@ -21,4 +21,17 @@ rf daily
 rf doctor
 ```
 
-`experiment`, `run`, and `compute` are stable top-level names; their executable actions are added by subsequent lifecycle phases.
+Experiment and local-run commands:
+
+```text
+rf experiment new --hypothesis HYP-0001 --title ... --question ...
+                  --command ... --allowed-paths ... --frozen-paths ...
+                  --primary ... --secondary ... --guardrails '{...}'
+                  --stop-conditions ... [--test-only]
+rf experiment show|transition|worktree|preflight
+rf experiment smoke|pilot|full
+rf experiment approve EXP-0001 --level full --yes
+rf run show|logs|artifacts RUN-000001
+```
+
+`compute` remains a stable top-level name; executable machine and lock actions are added by the remote-compute phase.
