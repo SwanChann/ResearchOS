@@ -48,3 +48,5 @@ rf compute plan NAME --project-id ID --experiment EXP-ID --commit SHA --command 
 ```
 
 `compute plan` is side-effect free. It shows the persistent remote repo/worktree/run layout and SSH steps; it never copies datasets, large checkpoints, or a whole repository.
+
+Compute commands do not require a default research project. A live `compute probe` returns a non-zero exit code when the target is unreachable; `--dry-run` remains successful without opening a connection.

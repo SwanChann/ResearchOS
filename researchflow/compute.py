@@ -59,7 +59,10 @@ def probe_machine(name: str, dry_run: bool = False) -> dict[str, Any]:
     command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", machine["host"], "uname -s; python3 --version; git --version; nvidia-smi --query-gpu=name,memory.total --format=csv,noheader"]
     if dry_run:
         return {"machine": name, "reachable": None, "dry_run": subprocess.list2cmdline(command), "probed": False}
-    result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+    except subprocess.TimeoutExpired:
+        return {"machine": name, "reachable": False, "stdout": "", "stderr": "SSH probe timed out after 15 seconds", "probed": True}
     return {"machine": name, "reachable": result.returncode == 0, "stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "probed": True}
 
 
@@ -217,7 +220,10 @@ def execute_compute_command(args: argparse.Namespace) -> int:
     elif args.action == "list":
         dump(load_config().get("machines", {}))
     elif args.action == "probe":
-        dump(probe_machine(args.name, args.dry_run))
+        result = probe_machine(args.name, args.dry_run)
+        dump(result)
+        if result.get("reachable") is False:
+            return 1
     elif args.action == "status":
         names = [args.name] if args.name else list(load_config().get("machines", {}))
         dump([lock_status(name) for name in names])

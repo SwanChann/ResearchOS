@@ -42,7 +42,9 @@ def dump(value: Any) -> None:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="rf", description="Local-first Research OS")
     root.add_argument("--project", help="project ID (or use the configured default)")
-    commands = root.add_subparsers(dest="command", required=True)
+    # Keep the top-level route separate from leaf options such as
+    # `experiment new --command` and `compute plan --command`.
+    commands = root.add_subparsers(dest="root_command", required=True)
 
     init = commands.add_parser("init", help="initialize global ResearchFlow configuration")
     init.add_argument("--home", type=Path, default=Path.home() / "ResearchFlow")
@@ -135,10 +137,10 @@ def parser() -> argparse.ArgumentParser:
 
 
 def execute(args: argparse.Namespace) -> int:
-    if args.command == "init":
+    if args.root_command == "init":
         print(f"Initialized: {init_config(args.home, force=args.force)}")
         return 0
-    if args.command == "project":
+    if args.root_command == "project":
         if args.action == "add":
             workspace = add_project(args.id, args.repo, args.name)
             config = load_config()
@@ -151,10 +153,11 @@ def execute(args: argparse.Namespace) -> int:
         else:
             dump(choose_project(args.id or args.project).data)
         return 0
-    project = choose_project(args.project) if args.command != "doctor" or args.project else None
-    if args.command == "status":
+    project_commands = {"status", "evidence", "memory", "hypothesis", "experiment", "run", "daily"}
+    project = choose_project(args.project) if args.root_command in project_commands else None
+    if args.root_command == "status":
         dump(project.status())
-    elif args.command == "evidence":
+    elif args.root_command == "evidence":
         store = project.evidence
         if args.evidence_kind == "search":
             dump(store.search(args.query))
@@ -168,7 +171,7 @@ def execute(args: argparse.Namespace) -> int:
             print(store.add_paper(args.pdf, args.title, csv(args.authors), args.venue, args.year, args.url, csv(args.tags)))
         else:
             print(store.add_repo(args.name, args.commit, args.url, args.local, csv(args.papers), csv(args.tags), args.notes))
-    elif args.command == "memory":
+    elif args.root_command == "memory":
         if args.action == "show":
             metadata, body = show_record(project, args.id)
             dump({"metadata": metadata, "body": body})
@@ -176,26 +179,26 @@ def execute(args: argparse.Namespace) -> int:
             print(add_observation(project, args.title, args.text, csv(args.evidence), args.confidence))
         else:
             print(add_decision(project, args.text, args.why, csv(args.evidence)))
-    elif args.command == "hypothesis":
+    elif args.root_command == "hypothesis":
         if args.action == "show":
             metadata, body = show_record(project, args.id)
             dump({"metadata": metadata, "body": body})
         else:
             print(add_hypothesis(project, args.title, args.statement, csv(args.observations), csv(args.papers), args.falsification))
-    elif args.command == "daily":
+    elif args.root_command == "daily":
         print(create_daily_log(project))
-    elif args.command == "doctor":
+    elif args.root_command == "doctor":
         checks = run_doctor(args.project)
         for check in checks:
             print(f"{'OK' if check.ok else 'FAIL':4} {check.name}: {check.detail}")
         return 0 if all(check.ok for check in checks) else 1
-    elif args.command == "experiment":
+    elif args.root_command == "experiment":
         from .experiments import execute_experiment_command
         return execute_experiment_command(project, args)
-    elif args.command == "run":
+    elif args.root_command == "run":
         from .runs import execute_run_command
         return execute_run_command(project, args)
-    elif args.command == "compute":
+    elif args.root_command == "compute":
         from .compute import execute_compute_command
         return execute_compute_command(args)
     return 0
@@ -211,4 +214,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
