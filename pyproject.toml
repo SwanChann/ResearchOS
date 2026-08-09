@@ -22,7 +22,9 @@ rf = "researchflow.cli:main"
 [tool.setuptools.packages.find]
 include = ["researchflow*"]
 
+[tool.setuptools.data-files]
+"share/researchflow/schemas" = ["schemas/*.schema.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-

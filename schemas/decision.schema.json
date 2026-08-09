@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "decision", "based_on", "created"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^DEC-[0-9]{4}$"},
+    "decision": {"type": "string", "minLength": 1},
+    "based_on": {"type": "array", "items": {"type": "string"}},
+    "created": {"type": "string"}
+  },
+  "additionalProperties": false
+}

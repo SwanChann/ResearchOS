@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "title", "status", "question", "hypothesis", "evidence", "baseline", "change", "scope", "metrics", "budget", "stop_conditions", "compute", "approval", "run", "created", "updated"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^EXP-[0-9]{4}$"},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"type": "string"},
+    "question": {"type": "string", "minLength": 1},
+    "hypothesis": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string", "pattern": "^HYP-[0-9]{4}$"}}, "additionalProperties": false},
+    "evidence": {"type": "object"},
+    "baseline": {"type": "object", "required": ["repo", "commit", "config"], "properties": {"repo": {"type": "string"}, "commit": {"type": ["string", "null"]}, "config": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "change": {"type": "object", "required": ["summary"], "properties": {"summary": {"type": "string"}}, "additionalProperties": false},
+    "scope": {"type": "object", "required": ["allowed_paths", "frozen_paths"], "properties": {"allowed_paths": {"type": "array", "items": {"type": "string"}}, "frozen_paths": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
+    "metrics": {"type": "object", "required": ["primary", "secondary", "guardrails"], "properties": {"primary": {"type": ["string", "null"]}, "secondary": {"type": "array", "items": {"type": "string"}}, "guardrails": {"type": "object"}}, "additionalProperties": false},
+    "budget": {"type": "object", "required": ["smoke", "pilot", "full"], "properties": {"smoke": {"type": "object"}, "pilot": {"type": "object"}, "full": {"type": "object"}}, "additionalProperties": false},
+    "stop_conditions": {"type": "array", "items": {"type": "string"}},
+    "compute": {"type": "object", "required": ["machine", "gpu_count"], "properties": {"machine": {"type": "string"}, "gpu_count": {"type": "integer", "minimum": 0, "maximum": 1}}, "additionalProperties": false},
+    "approval": {"type": "object", "required": ["implementation", "pilot", "full"], "properties": {"implementation": {"enum": ["auto", "human", "approved"]}, "pilot": {"enum": ["auto", "human", "approved"]}, "full": {"enum": ["human", "approved"]}}, "additionalProperties": false},
+    "run": {"type": "object", "required": ["command", "required_tests"], "properties": {"command": {"type": ["string", "null"]}, "required_tests": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
+    "experiment_commit": {"type": ["string", "null"]},
+    "created": {"type": "string"},
+    "updated": {"type": "string"}
+  },
+  "additionalProperties": false
+}

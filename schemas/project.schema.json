@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "repo", "compute", "paths", "created"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "name": {"type": "string", "minLength": 1},
+    "repo": {
+      "type": "object",
+      "required": ["local"],
+      "properties": {"local": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "compute": {"type": "object"},
+    "paths": {"type": "object"},
+    "created": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "experiment", "level", "status", "started_at", "ended_at", "command", "git", "config", "dataset", "environment", "hardware", "artifacts", "metrics", "exit_code", "test_only"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^RUN-[0-9]{6}$"},
+    "experiment": {"type": "string", "pattern": "^EXP-[0-9]{4}$"},
+    "level": {"enum": ["smoke", "pilot", "full"]},
+    "status": {"enum": ["queued", "running", "succeeded", "failed", "cancelled"]},
+    "started_at": {"type": "string"},
+    "ended_at": {"type": ["string", "null"]},
+    "command": {"type": "string"},
+    "git": {"type": "object", "required": ["repo", "branch", "commit", "dirty", "diff_hash"], "properties": {"repo": {"type": "string"}, "branch": {"type": ["string", "null"]}, "commit": {"type": "string"}, "dirty": {"type": "boolean"}, "diff_hash": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "config": {"type": "object"},
+    "dataset": {"type": "object"},
+    "environment": {"type": "object"},
+    "hardware": {"type": "object"},
+    "artifacts": {"type": "object"},
+    "metrics": {"type": "object"},
+    "exit_code": {"type": ["integer", "null"]},
+    "test_only": {"type": "boolean"},
+    "domain": {"type": "object"}
+  },
+  "additionalProperties": false
+}

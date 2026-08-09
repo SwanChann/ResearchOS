@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "status", "based_on", "created", "updated", "title"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^HYP-[0-9]{4}$"},
+    "status": {"enum": ["proposed", "testing", "supported", "rejected", "inconclusive"]},
+    "based_on": {
+      "type": "object",
+      "properties": {
+        "observations": {"type": "array", "items": {"type": "string", "pattern": "^OBS-[0-9]{4}$"}},
+        "papers": {"type": "array", "items": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"}}
+      },
+      "additionalProperties": false
+    },
+    "created": {"type": "string"},
+    "updated": {"type": "string"},
+    "title": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}
