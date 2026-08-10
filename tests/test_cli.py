@@ -108,3 +108,8 @@ def test_literature_matrix_cli_arguments_route_to_matrix():
     assert args.root_command == "evidence"
     assert args.evidence_kind == "matrix"
     assert args.action == "add"
+
+    synthesis_args = parser().parse_args(["evidence", "matrix", "synthesize", "synthesis.yaml"])
+    assert synthesis_args.root_command == "evidence"
+    assert synthesis_args.evidence_kind == "matrix"
+    assert synthesis_args.action == "synthesize"

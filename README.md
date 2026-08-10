@@ -47,10 +47,11 @@ rf evidence paper verify PAPER-0001 --sha256 HEX --source-version VERSION --page
 # Build a reproducible cross-paper comparison after individual verification:
 rf evidence matrix init --title "Navigation literature" --scope "Verified primary PDFs"
 rf evidence matrix add .\PAPER-0001.matrix-entry.yaml
+rf evidence matrix synthesize .\corpus-synthesis.yaml
 rf evidence matrix validate
 ```
 
-Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
+`matrix synthesize` accepts a schema-checked YAML file with `matrix_id`, `mode: replace|upsert`, and evidence-linked `syntheses`/`ideas`. Invalid paper or claim references are rejected before the atomic rewrite; replaying an unchanged update is idempotent. Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
 
 For a configured SSH target, the bounded remote lifecycle is:
 

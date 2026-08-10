@@ -141,6 +141,50 @@ class LiteratureMatrixStore:
         self._write(record)
         return paper_id
 
+    def synthesize_file(self, synthesis_path: Path) -> dict[str, Any]:
+        update = read_yaml(synthesis_path.expanduser().resolve())
+        validate_record("literature_synthesis", update)
+        return self.synthesize(update)
+
+    def synthesize(self, update: dict[str, Any]) -> dict[str, Any]:
+        """Atomically replace or upsert evidence-linked synthesis records."""
+        validate_record("literature_synthesis", update)
+        record = self.load()
+        if update["matrix_id"] != record["id"]:
+            raise ResearchFlowError(
+                f"Synthesis update targets {update['matrix_id']}, but this project contains {record['id']}."
+            )
+        for section in ("syntheses", "ideas"):
+            identifiers = [item["id"] for item in update[section]]
+            if len(identifiers) != len(set(identifiers)):
+                raise ResearchFlowError(f"Synthesis update contains duplicate {section} IDs.")
+
+        mode = update["mode"]
+        if mode == "replace":
+            syntheses = update["syntheses"]
+            ideas = update["ideas"]
+        else:
+            syntheses = self._upsert(record["syntheses"], update["syntheses"])
+            ideas = self._upsert(record["ideas"], update["ideas"])
+
+        changed = syntheses != record["syntheses"] or ideas != record["ideas"]
+        if changed:
+            candidate = dict(record)
+            candidate["syntheses"] = syntheses
+            candidate["ideas"] = ideas
+            candidate["updated_at"] = utc_now()
+            self._write(candidate)
+
+        return {
+            "path": str(self.path),
+            "matrix_id": record["id"],
+            "mode": mode,
+            "syntheses": len(syntheses),
+            "ideas": len(ideas),
+            "changed": changed,
+            "valid": True,
+        }
+
     def render(self) -> Path:
         record = self.load()
         atomic_text(self.path, markdown_record(record, self._render_body(record)))
@@ -152,6 +196,13 @@ class LiteratureMatrixStore:
         record["updated_at"] = utc_now()
         self._write(record)
         return self.path
+
+    @staticmethod
+    def _upsert(existing: list[dict[str, Any]], incoming: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        replacements = {item["id"]: item for item in incoming}
+        result = [replacements.pop(item["id"], item) for item in existing]
+        result.extend(replacements.values())
+        return result
 
     def _write(self, record: dict[str, Any]) -> None:
         self._validate(record)
@@ -227,7 +278,7 @@ class LiteratureMatrixStore:
             "",
             f"范围：{record['scope']}",
             "",
-            "> 本文由 YAML 前置数据生成。请使用 `rf evidence matrix add|validate|render` 修改或检查；正文不是第二份权威数据。",
+            "> 本文由 YAML 前置数据生成。请使用 `rf evidence matrix add|synthesize|validate|render` 修改或检查；正文不是第二份权威数据。",
             "",
             "## 证据边界",
             "",

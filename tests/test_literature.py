@@ -122,4 +122,88 @@ def test_matrix_cli_init_add_validate_and_render(rf_env, tmp_path, capsys):
     assert main(["evidence", "matrix", "add", str(entry_path)]) == 0
     assert main(["evidence", "matrix", "validate"]) == 0
     assert "valid: true" in capsys.readouterr().out
+    synthesis_path = tmp_path / "synthesis.yaml"
+    write_yaml(synthesis_path, synthesis_update(paper_id))
+    assert main(["evidence", "matrix", "synthesize", str(synthesis_path)]) == 0
+    assert "changed: true" in capsys.readouterr().out
+    assert main(["evidence", "matrix", "synthesize", str(synthesis_path)]) == 0
+    assert "changed: false" in capsys.readouterr().out
     assert main(["evidence", "matrix", "render"]) == 0
+
+
+def synthesis_update(*paper_ids: str, mode: str = "replace") -> dict:
+    evidence = [
+        {"paper_id": paper_id, "pages": "p. 2", "claim_ids": ["C01"], "locator": "TEST table"}
+        for paper_id in paper_ids
+    ]
+    return {
+        "matrix_id": "LITMATRIX-0001",
+        "mode": mode,
+        "syntheses": [{
+            "id": "SYN-001",
+            "statement": "TEST synthesis",
+            "strength": "paper_consensus",
+            "evidence": evidence,
+            "caveat": "TEST caveat",
+        }],
+        "ideas": [{
+            "id": "XIDEA-001",
+            "title": "TEST idea",
+            "trigger": "TEST trigger",
+            "mechanism": "TEST mechanism",
+            "falsification": "TEST falsification",
+            "risks": "TEST risks",
+            "novelty": "unchecked",
+            "evidence": evidence,
+        }],
+    }
+
+
+def test_matrix_synthesis_replace_is_validated_atomic_and_idempotent(rf_env, tmp_path):
+    add_project("toy", rf_env["repo"])
+    project = ResearchProject.open("toy")
+    first = verified_paper(project, tmp_path, "TEST Paper One")
+    second = verified_paper(project, tmp_path, "TEST Paper Two")
+    matrix = LiteratureMatrixStore(project)
+    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.add_entry(complete_entry(first))
+    matrix.add_entry(complete_entry(second))
+
+    update = synthesis_update(first, second)
+    result = matrix.synthesize(update)
+    assert result["changed"] is True
+    assert result["syntheses"] == 1
+    assert result["ideas"] == 1
+    before = matrix.path.read_text(encoding="utf-8")
+    assert matrix.synthesize(update)["changed"] is False
+    assert matrix.path.read_text(encoding="utf-8") == before
+    assert matrix.validate()["syntheses"] == 1
+
+    broken = synthesis_update(first, second)
+    broken["syntheses"][0]["evidence"][0]["claim_ids"] = ["C99"]
+    with pytest.raises(ResearchFlowError, match="C99 is absent"):
+        matrix.synthesize(broken)
+    assert matrix.path.read_text(encoding="utf-8") == before
+
+
+def test_matrix_synthesis_upsert_preserves_unmentioned_records(rf_env, tmp_path):
+    add_project("toy", rf_env["repo"])
+    project = ResearchProject.open("toy")
+    paper_id = verified_paper(project, tmp_path)
+    matrix = LiteratureMatrixStore(project)
+    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.add_entry(complete_entry(paper_id))
+    matrix.synthesize(synthesis_update(paper_id))
+
+    update = synthesis_update(paper_id, mode="upsert")
+    update["syntheses"][0]["statement"] = "TEST updated synthesis"
+    update["ideas"] = []
+    assert matrix.synthesize(update)["changed"] is True
+    record = matrix.load()
+    assert record["syntheses"][0]["statement"] == "TEST updated synthesis"
+    assert len(record["ideas"]) == 1
+
+    duplicate = synthesis_update(paper_id, mode="upsert")
+    duplicate["syntheses"].append({**duplicate["syntheses"][0], "statement": "TEST duplicate"})
+    with pytest.raises(ResearchFlowError, match="duplicate syntheses IDs"):
+        matrix.synthesize(duplicate)

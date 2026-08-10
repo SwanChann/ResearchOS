@@ -125,6 +125,10 @@ def parser() -> argparse.ArgumentParser:
     matrix_actions.add_parser("validate")
     matrix_add = matrix_actions.add_parser("add")
     matrix_add.add_argument("entry", type=Path, help="YAML entry containing one verified paper and every matrix axis")
+    matrix_synthesize = matrix_actions.add_parser("synthesize")
+    matrix_synthesize.add_argument(
+        "update", type=Path, help="YAML update containing evidence-linked cross-paper syntheses and ideas"
+    )
     matrix_actions.add_parser("render")
     matrix_actions.add_parser("show")
     search = evidence_actions.add_parser("search")
@@ -236,6 +240,8 @@ def execute(args: argparse.Namespace) -> int:
                 dump(matrix_store.validate())
             elif args.action == "add":
                 print(matrix_store.add_entry_file(args.entry))
+            elif args.action == "synthesize":
+                dump(matrix_store.synthesize_file(args.update))
             elif args.action == "render":
                 print(matrix_store.render())
             else:

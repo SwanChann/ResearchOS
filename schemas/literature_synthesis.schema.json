@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "cross_evidence_ref": {
+      "type": "object",
+      "required": ["paper_id", "pages", "claim_ids", "locator"],
+      "properties": {
+        "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "pages": {"type": "string", "pattern": "^pp?\\.\\s*[0-9]+"},
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^C[0-9]{2}$"}
+        },
+        "locator": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "synthesis": {
+      "type": "object",
+      "required": ["id", "statement", "strength", "evidence", "caveat"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^SYN-[0-9]{3}$"},
+        "statement": {"type": "string", "minLength": 1},
+        "strength": {"enum": ["analyst_inference", "paper_consensus", "paper_disagreement"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/cross_evidence_ref"}
+        },
+        "caveat": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "idea": {
+      "type": "object",
+      "required": ["id", "title", "trigger", "mechanism", "falsification", "risks", "novelty", "evidence"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^XIDEA-[0-9]{3}$"},
+        "title": {"type": "string", "minLength": 1},
+        "trigger": {"type": "string", "minLength": 1},
+        "mechanism": {"type": "string", "minLength": 1},
+        "falsification": {"type": "string", "minLength": 1},
+        "risks": {"type": "string", "minLength": 1},
+        "novelty": {"enum": ["unchecked", "checked"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/cross_evidence_ref"}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["matrix_id", "mode", "syntheses", "ideas"],
+  "properties": {
+    "matrix_id": {"type": "string", "pattern": "^LITMATRIX-[0-9]{4}$"},
+    "mode": {"enum": ["replace", "upsert"]},
+    "syntheses": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/synthesis"}
+    },
+    "ideas": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/idea"}
+    }
+  },
+  "additionalProperties": false
+}
