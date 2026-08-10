@@ -105,6 +105,15 @@ def parser() -> argparse.ArgumentParser:
         actions.add_parser("list")
         show_e = actions.add_parser("show")
         show_e.add_argument("id")
+        if kind == "paper":
+            verify_e = actions.add_parser("verify", help="finalize a page-cited primary-source deep read")
+            verify_e.add_argument("id")
+            verify_e.add_argument("--sha256", required=True)
+            verify_e.add_argument("--source-version", required=True)
+            verify_e.add_argument("--pages", required=True, type=int)
+            verify_e.add_argument("--core-operator", required=True)
+            verify_e.add_argument("--primary-logic", required=True)
+            verify_e.add_argument("--methods", required=True)
         if kind == "repo":
             search_e = actions.add_parser("search")
             search_e.add_argument("query")
@@ -237,6 +246,16 @@ def execute(args: argparse.Namespace) -> int:
             dump(store.list(args.evidence_kind))
         elif args.action == "show":
             dump(store.show(args.id))
+        elif args.evidence_kind == "paper" and args.action == "verify":
+            print(store.verify_paper(
+                args.id,
+                sha256=args.sha256,
+                source_version=args.source_version,
+                page_count=args.pages,
+                core_operator=args.core_operator,
+                primary_logic=args.primary_logic,
+                methods=csv(args.methods),
+            ))
         elif args.action == "search":
             dump(store.search(args.query, args.evidence_kind))
         elif args.evidence_kind == "paper":

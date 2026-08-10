@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,13 @@ from .project import ResearchProject
 from .schema import validate_record
 from .zotero import ZoteroClient, item_metadata
 
-PAPER_BODY = """# {title}
+DEEP_READ_BODY = """# {title}
+
+## Source Snapshot
+
+- Primary document inspected: not yet
+- Version and file hash: not yet recorded
+- Citation basis: PDF page number printed by the reader
 
 ## TL;DR
 
@@ -31,49 +38,59 @@ Needs verification.
 
 ## Key Results
 
+## Claim Strength Scale
+
+- **S1 - direct quantitative:** a number transcribed from a named table, figure, or experiment in the primary document.
+- **S2 - direct descriptive:** an architecture, procedure, or limitation explicitly stated or shown in the primary document.
+- **S3 - author interpretation:** the authors' explanation or generalization from their evidence; not independently established.
+- **S4 - analyst inference:** a project-specific interpretation or idea derived from the paper; not a paper claim.
+
+Strength labels describe the source relationship, not whether a claim is universally true or independently reproduced.
+
+## Verified Claims
+
+| ID | Claim | Strength | PDF page(s) | Locator | Scope / qualifier |
+|---|---|---|---|---|---|
+| C01 | Needs verification. | - | - | - | - |
+
+## Critical Assessment
+
 ## Limitations
 
 ## Relevance to Project
 
-## Verified Claims
+## Idea Seeds
 
-No claims verified yet.
+### IDEA-01 - Untitled
+
+- **Trigger:** Which paper result, limitation, or contradiction prompted the idea?
+- **Proposed mechanism:** What change might cause what effect, and why?
+- **Supporting evidence:** Claim IDs and PDF page citations.
+- **Counterevidence / risk:** What could make the mechanism wrong or impractical?
+- **Novelty status:** Unchecked until a separate current literature search is completed.
+- **Smallest falsification test:** The cheapest observation or experiment that can reject it.
+- **Promotion rule:** Keep as an idea seed until converted into a falsifiable `HYP-*` record.
 
 ## Open Questions
 """
+
+PAPER_BODY = DEEP_READ_BODY
 
 ZOTERO_PAPER_BODY = """# {title}
 
 ## Source Authority
 
 Zotero owns the bibliography, PDF, collections, tags, notes, annotations, and citation formatting. ResearchFlow stores only this source reference and the analysis below.
+""" + DEEP_READ_BODY.split("\n", 1)[1]
 
-## TL;DR
 
-Needs verification.
-
-## Problem
-
-## Core Method
-
-## Architecture
-
-## Training
-
-## Evaluation
-
-## Key Results
-
-## Limitations
-
-## Relevance to Project
-
-## Verified Claims
-
-No claims verified yet.
-
-## Open Questions
-"""
+DEEP_READ_REQUIRED_HEADINGS = (
+    "Source Snapshot",
+    "Claim Strength Scale",
+    "Verified Claims",
+    "Critical Assessment",
+    "Idea Seeds",
+)
 
 
 class EvidenceStore:
@@ -98,7 +115,7 @@ class EvidenceStore:
         metadata = {
             "id": record_id, "title": title, "authors": authors or [], "venue": venue,
             "year": year, "source": {"url": url, "local_pdf": relative_pdf},
-            "tags": tags or [], "status": "unread", "core_operator": None,
+            "tags": tags or [], "methods": [], "status": "unread", "core_operator": None,
             "primary_logic": None, "verified_at": None,
         }
         validate_record("paper", metadata)
@@ -135,6 +152,7 @@ class EvidenceStore:
             "year": extracted["year"],
             "source": {"url": extracted["url"], "local_pdf": None, "zotero": source_ref},
             "tags": extracted["tags"],
+            "methods": [],
             "status": "unread",
             "core_operator": None,
             "primary_logic": None,
@@ -170,11 +188,74 @@ class EvidenceStore:
         self._replace_paper_index(record_id, self._paper_index(metadata, path))
         return record_id
 
+    def verify_paper(
+        self,
+        record_id: str,
+        *,
+        sha256: str,
+        source_version: str,
+        page_count: int,
+        core_operator: str,
+        primary_logic: str,
+        methods: list[str],
+    ) -> str:
+        """Finalize a primary-source deep read and synchronize its searchable index."""
+        path = self.project.root / "evidence" / "papers" / "analysis" / f"{record_id}.md"
+        if not path.exists():
+            raise ResearchFlowError(f"Paper evidence not found: {record_id}")
+        metadata, body = read_markdown_record(path)
+        self._validate_deep_read(body)
+        normalized_hash = sha256.upper()
+        if not re.fullmatch(r"[0-9A-F]{64}", normalized_hash):
+            raise ResearchFlowError("--sha256 must be exactly 64 hexadecimal characters.")
+        if page_count < 1:
+            raise ResearchFlowError("--pages must be a positive PDF page count.")
+        if not source_version.strip() or not core_operator.strip() or not primary_logic.strip():
+            raise ResearchFlowError("Source version, core operator, and primary logic must be non-empty.")
+        normalized_methods = list(dict.fromkeys(item.strip() for item in methods if item.strip()))
+        if not normalized_methods:
+            raise ResearchFlowError("At least one method is required for a verified paper.")
+
+        verified_at = utc_now()
+        metadata["source"]["document"] = {
+            "sha256": normalized_hash,
+            "version": source_version.strip(),
+            "page_count": page_count,
+            "citation_basis": "pdf_page",
+            "inspected_at": verified_at,
+        }
+        metadata["methods"] = normalized_methods
+        metadata["status"] = "verified"
+        metadata["core_operator"] = core_operator.strip()
+        metadata["primary_logic"] = primary_logic.strip()
+        metadata["verified_at"] = verified_at
+        validate_record("paper", metadata)
+        atomic_text(path, markdown_record(metadata, body))
+        self._replace_paper_index(record_id, self._paper_index(metadata, path))
+        return record_id
+
+    @staticmethod
+    def _validate_deep_read(body: str) -> None:
+        missing = [heading for heading in DEEP_READ_REQUIRED_HEADINGS if f"## {heading}" not in body]
+        if missing:
+            raise ResearchFlowError(f"Deep-read analysis is missing required sections: {', '.join(missing)}")
+        if "Needs verification." in body or "No claims verified yet." in body:
+            raise ResearchFlowError("Deep-read analysis still contains an unread placeholder.")
+        if not re.search(r"\b(?:p|pp)\.\s*\d+", body, flags=re.IGNORECASE):
+            raise ResearchFlowError("Deep-read analysis needs at least one PDF page citation such as 'p. 6'.")
+        if not re.search(r"\bC\d{2}\b", body):
+            raise ResearchFlowError("Deep-read analysis needs at least one claim ID such as C01.")
+        if not re.search(r"\bIDEA-\d{2}\b", body):
+            raise ResearchFlowError("Deep-read analysis needs at least one structured idea seed such as IDEA-01.")
+
     def _paper_index(self, metadata: dict[str, Any], analysis: Path) -> dict[str, Any]:
         zotero = metadata.get("source", {}).get("zotero")
         return {
             "id": metadata["id"], "title": metadata["title"], "year": metadata["year"],
-            "venue": metadata["venue"], "tags": metadata["tags"], "methods": [],
+            "venue": metadata["venue"], "tags": metadata["tags"],
+            "methods": metadata.get("methods", []), "status": metadata["status"],
+            "core_operator": metadata.get("core_operator"),
+            "primary_logic": metadata.get("primary_logic"),
             "analysis_path": analysis.relative_to(self.project.root).as_posix(),
             "pdf_path": metadata.get("source", {}).get("local_pdf"),
             "zotero": zotero,

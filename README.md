@@ -42,6 +42,8 @@ rf evidence zotero status
 rf evidence zotero search "visual navigation"
 rf evidence zotero show ITEMKEY
 rf evidence zotero link ITEMKEY
+# Edit the PAPER-* analysis after reading the primary PDF, then finalize it:
+rf evidence paper verify PAPER-0001 --sha256 HEX --source-version VERSION --pages N --core-operator TEXT --primary-logic TEXT --methods method-a,method-b
 ```
 
 Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
@@ -143,7 +145,7 @@ python -m pytest tests/test_e2e_toy.py -q
 - SSH submit/status/collect/register has been validated against a real server with a deterministic `TEST / MOCK`, CPU-only fixture. This proves the remote workflow and provenance path, not GPU scheduling quality or any scientific result.
 - A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
 - Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
-- Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow has no built-in PDF parser, embeddings, or vector database.
+- Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow supplies a page-cited deep-read template plus an explicit verification/fingerprint gate, but has no built-in PDF parser, embeddings, or vector database.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 

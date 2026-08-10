@@ -49,6 +49,7 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 ## Safety boundaries
 
 - Formal runs are clean-commit-first by default.
+- Local Git commands trust only the explicitly selected repository for that invocation; ResearchFlow does not require a global `safe.directory` exception on shared Windows installations.
 - Experiment cards constrain allowed and frozen paths.
 - Research lifecycle and compute-job lifecycle are separate.
 - Heavy jobs require a single-GPU lock; stale locks are detectable, not silently removed.

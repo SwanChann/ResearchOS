@@ -8,8 +8,14 @@ from pathlib import Path
 from .errors import ResearchFlowError
 
 
+def git_command(repo: Path, *args: str) -> list[str]:
+    """Build a Git command that trusts only this explicitly selected repository."""
+    safe_repo = repo.resolve().as_posix()
+    return ["git", "-c", f"safe.directory={safe_repo}", "-C", str(repo), *args]
+
+
 def git(repo: Path, *args: str, check: bool = True) -> str:
-    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    result = subprocess.run(git_command(repo, *args), capture_output=True, text=True)
     if check and result.returncode:
         detail = result.stderr.strip() or result.stdout.strip()
         raise ResearchFlowError(f"Git command failed in {repo}: git {' '.join(args)}\n{detail}")
@@ -34,7 +40,7 @@ def branch(repo: Path) -> str | None:
 
 
 def commit_exists(repo: Path, commit: str) -> bool:
-    result = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{commit}^{{commit}}"], capture_output=True)
+    result = subprocess.run(git_command(repo, "cat-file", "-e", f"{commit}^{{commit}}"), capture_output=True)
     return result.returncode == 0
 
 
@@ -44,7 +50,7 @@ def dirty_paths(repo: Path) -> list[str]:
 
 
 def diff_hash(repo: Path) -> str | None:
-    tracked = subprocess.run(["git", "-C", str(repo), "diff", "--binary", "HEAD"], capture_output=True).stdout
+    tracked = subprocess.run(git_command(repo, "diff", "--binary", "HEAD"), capture_output=True).stdout
     untracked = "\n".join(path for path in dirty_paths(repo) if not (repo / path).exists() or git(repo, "ls-files", "--error-unmatch", path, check=False) == "")
     payload = tracked + untracked.encode()
     return hashlib.sha256(payload).hexdigest() if payload else None
@@ -88,7 +94,7 @@ def create_worktree(repo: Path, target: Path, baseline: str, dry_run: bool = Fal
     if dry_run:
         return f"DRY-RUN: {command}"
     target.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(target), baseline], capture_output=True, text=True)
+    result = subprocess.run(git_command(repo, "worktree", "add", "--detach", str(target), baseline), capture_output=True, text=True)
     if result.returncode:
         raise ResearchFlowError(f"Cannot create experiment worktree {target}: {result.stderr.strip()}")
     return str(target)

@@ -25,11 +25,24 @@
             "linked_at": {"type": "string", "minLength": 1}
           },
           "additionalProperties": false
+        },
+        "document": {
+          "type": "object",
+          "required": ["sha256", "version", "page_count", "citation_basis", "inspected_at"],
+          "properties": {
+            "sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+            "version": {"type": "string", "minLength": 1},
+            "page_count": {"type": "integer", "minimum": 1},
+            "citation_basis": {"const": "pdf_page"},
+            "inspected_at": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
     "tags": {"type": "array", "items": {"type": "string"}},
+    "methods": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "status": {"enum": ["unread", "skimmed", "verified"]},
     "core_operator": {"type": ["string", "null"]},
     "primary_logic": {"type": ["string", "null"]},

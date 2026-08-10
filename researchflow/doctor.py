@@ -13,6 +13,7 @@ from .schema import schema_dir, validate_record
 from .io import read_yaml
 from .records import broken_references
 from .compute import probe_machine
+from .gitops import git
 
 
 @dataclass
@@ -47,8 +48,11 @@ def run_doctor(project_id: str | None = None) -> list[Check]:
         checks.append(Check(f"project {candidate} path", project.root.is_dir(), str(project.root)))
         checks.append(Check(f"project {candidate} repo", project.repo.is_dir(), str(project.repo)))
         if project.repo.is_dir() and (project.repo / ".git").exists():
-            result = subprocess.run(["git", "-C", str(project.repo), "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True)
-            checks.append(Check(f"project {candidate} Git", result.returncode == 0, result.stderr.strip() or result.stdout.strip()))
+            try:
+                inside = git(project.repo, "rev-parse", "--is-inside-work-tree")
+                checks.append(Check(f"project {candidate} Git", inside == "true", inside))
+            except ResearchFlowError as exc:
+                checks.append(Check(f"project {candidate} Git", False, str(exc)))
         canonical = [
             project.root / "memory" / "observations",
             project.root / "memory" / "hypotheses",

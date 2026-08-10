@@ -11,6 +11,8 @@ rf project list|show
 rf status
 rf evidence paper add PDF --title TITLE [metadata]
 rf evidence paper list|show
+rf evidence paper verify PAPER-ID --sha256 HEX --source-version VERSION --pages N
+                         --core-operator TEXT --primary-logic TEXT --methods CSV
 rf evidence repo add --name NAME --commit SHA (--url URL | --local PATH)
 rf evidence repo list|show|search
 rf evidence search QUERY
@@ -28,7 +30,9 @@ rf daily
 rf doctor
 ```
 
-Zotero subcommands are read-only toward Zotero. Search/full-text indexing, collections/tags, attachments/annotations, and CSL formatting remain Zotero functions. `link` and `refresh` are the only ResearchFlow writes: they maintain a `PAPER-*` analysis/source reference and never copy Zotero PDFs. See [Zotero integration](zotero.md).
+Zotero subcommands are read-only toward Zotero. Search/full-text indexing, collections/tags, attachments/annotations, and CSL formatting remain Zotero functions. `link`, `refresh`, and `paper verify` write only ResearchFlow analysis/provenance records and never copy or modify Zotero PDFs. See [Zotero integration](zotero.md).
+
+After primary-source inspection, `paper verify` validates the required page-cited deep-read sections, marks the paper `verified`, records the inspected PDF hash/version/page count, and synchronizes method/status fields into the paper index. Here `verified` means checked against that exact document, not independently reproduced.
 
 Experiment and run commands:
 

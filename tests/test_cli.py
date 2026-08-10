@@ -87,3 +87,17 @@ def test_leaf_command_option_does_not_replace_top_level_route():
     ])
     assert args.root_command == "experiment"
     assert args.command == "python baseline.py"
+
+
+def test_paper_verify_cli_arguments_do_not_shadow_top_level_route():
+    args = parser().parse_args([
+        "evidence", "paper", "verify", "PAPER-0001",
+        "--sha256", "A" * 64,
+        "--source-version", "TEST-v1",
+        "--pages", "2",
+        "--core-operator", "TEST operator",
+        "--primary-logic", "TEST logic",
+        "--methods", "TEST method",
+    ])
+    assert args.root_command == "evidence"
+    assert args.action == "verify"

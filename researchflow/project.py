@@ -20,7 +20,7 @@ WORKSPACE_DIRS = (
 )
 
 SKILL_NAMES = (
-    "retrieve-before-reason", "literature-query", "code-evidence-query",
+    "retrieve-before-reason", "literature-query", "paper-deep-read", "code-evidence-query",
     "hypothesis-focus", "experiment-design", "experiment-review",
     "experiment-run", "result-analysis", "daily-log",
 )

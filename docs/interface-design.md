@@ -12,7 +12,7 @@ Core forms:
 rf init [--home PATH]
 rf project add|list|show
 rf status
-rf evidence paper add|list|show
+rf evidence paper add|list|show|verify
 rf evidence repo add|list|show|search
 rf evidence search QUERY
 rf evidence zotero configure|status|libraries|collections|search|show|bibliography|link|refresh
@@ -60,3 +60,5 @@ Each `skills/<name>/SKILL.md` declares purpose, required inputs/retrieval, prohi
 `memory observation add` and `memory decision add` remain grouped instead of adding `observe`/`decide` aliases. State changes use one `experiment transition` primitive; `smoke`, `pilot`, and `full` are execution commands with gate checks, not aliases for arbitrary transitions.
 
 Zotero operations stay under `evidence zotero`: Zotero owns retrieval, organization, attachment/annotation context, and citation formatting; ResearchFlow `link` is the single handoff into a `PAPER-*` analysis.
+
+`evidence paper verify` is the explicit completion gate for a primary-source deep read. It checks the Markdown contract and records only the inspected document's fingerprint/version/page basis plus searchable analysis labels; it does not copy or mutate the Zotero-owned PDF.
