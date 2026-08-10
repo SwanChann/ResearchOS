@@ -1,4 +1,4 @@
-from researchflow.cli import main, parser
+from researchflow.cli import _configure_utf8_output, main, parser
 from researchflow.project import ResearchProject
 from researchflow.records import add_decision, add_observation
 
@@ -15,6 +15,30 @@ def test_cli_project_memory_and_doctor(rf_env, capsys):
 def test_cli_error_has_fix_context(rf_env, capsys):
     assert main(["status"]) == 2
     assert "Project is ambiguous" in capsys.readouterr().err
+
+
+def test_windows_redirected_output_is_reconfigured_to_utf8():
+    class FakeStream:
+        def __init__(self, encoding="gbk", isatty=False):
+            self.encoding = encoding
+            self._isatty = isatty
+            self.reconfigured = []
+
+        def isatty(self):
+            return self._isatty
+
+        def reconfigure(self, **kwargs):
+            self.reconfigured.append(kwargs)
+
+    redirected = FakeStream()
+    terminal = FakeStream(isatty=True)
+    already_utf8 = FakeStream(encoding="utf-8")
+
+    _configure_utf8_output((redirected, terminal, already_utf8), platform="win32")
+
+    assert redirected.reconfigured == [{"encoding": "utf-8"}]
+    assert terminal.reconfigured == []
+    assert already_utf8.reconfigured == []
 
 
 def test_doctor_detects_manually_broken_reference(rf_env, capsys):

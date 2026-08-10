@@ -20,6 +20,25 @@ def csv(value: str | None) -> list[str]:
     return [item.strip() for item in (value or "").split(",") if item.strip()]
 
 
+def _configure_utf8_output(streams: tuple[Any, ...] | None = None, platform: str | None = None) -> None:
+    """Keep redirected Windows CLI output lossless for Unicode research metadata."""
+    if (platform or sys.platform) != "win32":
+        return
+    for stream in streams or (sys.stdout, sys.stderr):
+        if stream is None or stream.isatty():
+            continue
+        encoding = (getattr(stream, "encoding", "") or "").lower().replace("_", "-")
+        reconfigure = getattr(stream, "reconfigure", None)
+        if encoding in {"utf-8", "utf8"} or not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (OSError, ValueError):
+            # Some embedded streams cannot be reconfigured. Preserve the
+            # existing stream rather than making every CLI command fail.
+            pass
+
+
 def choose_project(project_id: str | None) -> ResearchProject:
     config = load_config()
     candidate = project_id or config.get("default_project")
@@ -258,6 +277,7 @@ def execute(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_utf8_output()
     try:
         return execute(parser().parse_args(argv))
     except ResearchFlowError as exc:
