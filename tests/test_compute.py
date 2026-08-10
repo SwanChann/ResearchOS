@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from researchflow.compute import (
+    _pid_alive,
     acquire_gpu_lock,
     add_machine,
     jobs_path,
@@ -29,6 +31,11 @@ from researchflow.records import add_hypothesis, add_observation
 def _commit(repo: Path, message: str) -> None:
     subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-m", message], check=True, capture_output=True)
+
+
+def test_pid_probe_is_non_destructive_for_current_process():
+    assert _pid_alive(os.getpid()) is True
+    assert _pid_alive(-1) is False
 
 
 def _remote_test_experiment(rf_env):
