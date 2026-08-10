@@ -1,17 +1,52 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from typing import Any
 
-from .config import research_home
+from .config import load_config, research_home
 from .errors import ResearchFlowError
 from .ids import allocate_id
 from .io import append_jsonl, atomic_text, markdown_record, read_jsonl, read_markdown_record, read_yaml, utc_now, write_yaml
 from .project import ResearchProject
 from .schema import validate_record
+from .zotero import ZoteroClient, item_metadata
 
 PAPER_BODY = """# {title}
+
+## TL;DR
+
+Needs verification.
+
+## Problem
+
+## Core Method
+
+## Architecture
+
+## Training
+
+## Evaluation
+
+## Key Results
+
+## Limitations
+
+## Relevance to Project
+
+## Verified Claims
+
+No claims verified yet.
+
+## Open Questions
+"""
+
+ZOTERO_PAPER_BODY = """# {title}
+
+## Source Authority
+
+Zotero owns the bibliography, PDF, collections, tags, notes, annotations, and citation formatting. ResearchFlow stores only this source reference and the analysis below.
 
 ## TL;DR
 
@@ -46,6 +81,11 @@ class EvidenceStore:
         self.project = project
 
     def add_paper(self, pdf: Path, title: str, authors: list[str] | None = None, venue: str | None = None, year: int | None = None, url: str | None = None, tags: list[str] | None = None) -> str:
+        literature = load_config().get("preferences", {}).get("literature", {})
+        if literature.get("authority") == "zotero":
+            raise ResearchFlowError(
+                "Manual PDF copying is disabled because Zotero is the literature authority. Add the item/PDF in Zotero, then run: rf evidence zotero link <ITEM-KEY>"
+            )
         pdf = pdf.expanduser().resolve()
         if not pdf.is_file():
             raise ResearchFlowError(f"Paper PDF does not exist: {pdf}")
@@ -71,6 +111,83 @@ class EvidenceStore:
             "pdf_path": relative_pdf,
         })
         return record_id
+
+    def link_zotero(self, client: ZoteroClient, item_key: str) -> str:
+        item = client.item(item_key)
+        source_ref = {
+            "server_id": client.server_id,
+            "library": client.library,
+            "item_key": item.get("key") or item_key,
+            "item_version": item.get("version") or item.get("data", {}).get("version"),
+            "linked_at": utc_now(),
+        }
+        for existing in self.list("paper"):
+            zotero = existing.get("zotero") or {}
+            if all(zotero.get(key) == source_ref.get(key) for key in ("server_id", "library", "item_key")):
+                return str(existing["id"])
+        extracted = item_metadata(item)
+        record_id = allocate_id(research_home(), "PAPER")
+        metadata = {
+            "id": record_id,
+            "title": extracted["title"],
+            "authors": extracted["authors"],
+            "venue": extracted["venue"],
+            "year": extracted["year"],
+            "source": {"url": extracted["url"], "local_pdf": None, "zotero": source_ref},
+            "tags": extracted["tags"],
+            "status": "unread",
+            "core_operator": None,
+            "primary_logic": None,
+            "verified_at": None,
+        }
+        validate_record("paper", metadata)
+        analysis = self.project.root / "evidence" / "papers" / "analysis" / f"{record_id}.md"
+        atomic_text(analysis, markdown_record(metadata, ZOTERO_PAPER_BODY.format(title=extracted["title"])))
+        append_jsonl(self.project.root / "evidence" / "papers" / "index.jsonl", self._paper_index(metadata, analysis))
+        return record_id
+
+    def refresh_zotero(self, record_id: str, client: ZoteroClient) -> str:
+        path = self.project.root / "evidence" / "papers" / "analysis" / f"{record_id}.md"
+        if not path.exists():
+            raise ResearchFlowError(f"Paper evidence not found: {record_id}")
+        metadata, body = read_markdown_record(path)
+        source_ref = metadata.get("source", {}).get("zotero")
+        if not source_ref:
+            raise ResearchFlowError(f"Paper {record_id} is not linked to Zotero.")
+        if client.library != source_ref.get("library"):
+            raise ResearchFlowError(f"Paper {record_id} belongs to Zotero library {source_ref.get('library')}.")
+        item = client.item(str(source_ref["item_key"]))
+        if source_ref.get("server_id") and client.server_id and source_ref["server_id"] != client.server_id:
+            raise ResearchFlowError("Zotero database identity differs from the linked paper; refusing to refresh.")
+        extracted = item_metadata(item)
+        metadata.update({key: extracted[key] for key in ("title", "authors", "venue", "year", "tags")})
+        metadata["source"]["url"] = extracted["url"]
+        metadata["source"]["zotero"]["server_id"] = client.server_id
+        metadata["source"]["zotero"]["item_version"] = extracted["item_version"]
+        metadata["source"]["zotero"]["linked_at"] = utc_now()
+        validate_record("paper", metadata)
+        atomic_text(path, markdown_record(metadata, body))
+        self._replace_paper_index(record_id, self._paper_index(metadata, path))
+        return record_id
+
+    def _paper_index(self, metadata: dict[str, Any], analysis: Path) -> dict[str, Any]:
+        zotero = metadata.get("source", {}).get("zotero")
+        return {
+            "id": metadata["id"], "title": metadata["title"], "year": metadata["year"],
+            "venue": metadata["venue"], "tags": metadata["tags"], "methods": [],
+            "analysis_path": analysis.relative_to(self.project.root).as_posix(),
+            "pdf_path": metadata.get("source", {}).get("local_pdf"),
+            "zotero": zotero,
+        }
+
+    def _replace_paper_index(self, record_id: str, replacement: dict[str, Any]) -> None:
+        path = self.project.root / "evidence" / "papers" / "index.jsonl"
+        items = read_jsonl(path)
+        updated = [replacement if item.get("id") == record_id else item for item in items]
+        if not any(item.get("id") == record_id for item in items):
+            updated.append(replacement)
+        text = "".join(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n" for item in updated)
+        atomic_text(path, text)
 
     def add_repo(self, name: str, commit: str, url: str | None = None, local: Path | None = None, related_papers: list[str] | None = None, tags: list[str] | None = None, notes: str = "") -> str:
         if not url and not local:
@@ -120,4 +237,3 @@ class EvidenceStore:
         if kind in (None, "repo"):
             candidates.extend({"kind": "repo", **item} for item in self.list("repo"))
         return [item for item in candidates if all(term in str(item).casefold() for term in terms)]
-

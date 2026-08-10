@@ -14,12 +14,21 @@ rf evidence paper list|show
 rf evidence repo add --name NAME --commit SHA (--url URL | --local PATH)
 rf evidence repo list|show|search
 rf evidence search QUERY
+rf evidence zotero configure [--base-url LOOPBACK_API] [--library users/0]
+rf evidence zotero status|libraries|collections
+rf evidence zotero search QUERY [--collection KEY] [--tag TAG] [--limit N]
+rf evidence zotero show ITEM_KEY
+rf evidence zotero bibliography ITEM_KEY... [--style CSL_STYLE] [--locale LOCALE]
+rf evidence zotero link ITEM_KEY
+rf evidence zotero refresh PAPER-ID
 rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
 rf daily
 rf doctor
 ```
+
+Zotero subcommands are read-only toward Zotero. Search/full-text indexing, collections/tags, attachments/annotations, and CSL formatting remain Zotero functions. `link` and `refresh` are the only ResearchFlow writes: they maintain a `PAPER-*` analysis/source reference and never copy Zotero PDFs. See [Zotero integration](zotero.md).
 
 Experiment and run commands:
 

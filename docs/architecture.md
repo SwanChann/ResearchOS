@@ -16,7 +16,7 @@ filesystem adapters + Git/SSH subprocess boundaries
 YAML, Markdown, JSON, JSONL, ordinary directories
 ```
 
-The functional core validates records, IDs, transitions, scope, and provenance. Thin service objects provide `ResearchProject` and evidence/experiment access. There is no database, daemon, plugin runtime, scheduler framework, or agent-specific state.
+The functional core validates records, IDs, transitions, scope, and provenance. Thin service objects provide `ResearchProject` and evidence/experiment access. The Zotero adapter is a read-only loopback boundary, not a second literature store. There is no database, daemon, plugin runtime, scheduler framework, or agent-specific state.
 
 ## Data placement
 
@@ -55,7 +55,8 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 - Remote operations and artifact collection support dry-run.
 - Remote jobs use an atomic lock directory on the server and append-only state events; this is cooperative coordination, not an operating-system GPU reservation.
 - Secrets stay in environment variables, SSH configuration, or credential stores.
+- The Zotero adapter accepts loopback `/api` URLs only, implements `GET` only, and never requests or stores a write key.
 
 ## Deliberate omissions
 
-V0.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Structured filtering, full-text search, and agent reranking are sufficient until measured retrieval needs justify more infrastructure.
+V0.3 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps only the analysis/provenance handoff until measured needs justify more infrastructure.

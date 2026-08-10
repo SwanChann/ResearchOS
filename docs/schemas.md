@@ -3,7 +3,7 @@
 Machine-readable JSON Schemas live in `schemas/` and are packaged as installation data. Records are validated before write and again when opened where practical.
 
 - `project`: project identity plus research-repository reference.
-- `paper`: literature metadata and verification state.
+- `paper`: literature metadata and verification state; a Zotero-linked source may contain database/library/item/version provenance while `local_pdf` remains null.
 - `repository_evidence`: URL/local path plus mandatory commit pin.
 - `observation`, `hypothesis`, `decision`: epistemically distinct Markdown records with YAML frontmatter.
 - `experiment`: lifecycle, scope, metrics, budgets, approvals, and execution command.

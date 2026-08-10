@@ -44,6 +44,22 @@ def save_config(data: dict[str, Any], path: Path | None = None) -> None:
     write_yaml(path or config_path(), data)
 
 
+def configure_zotero(base_url: str, library: str, path: Path | None = None) -> dict[str, Any]:
+    # Import lazily to keep ordinary config loading independent of integrations.
+    from .zotero import validate_base_url, validate_library
+    data = load_config(path)
+    preferences = data.setdefault("preferences", {})
+    preferences["literature"] = {
+        "authority": "zotero",
+        "zotero": {
+            "access": "read_only",
+            "base_url": validate_base_url(base_url),
+            "library": validate_library(library),
+        },
+    }
+    save_config(data, path)
+    return preferences["literature"]
+
+
 def research_home(config: dict[str, Any] | None = None) -> Path:
     return Path((config or load_config())["research_home"]).expanduser().resolve()
-

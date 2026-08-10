@@ -8,7 +8,27 @@
     "authors": {"type": "array", "items": {"type": "string"}},
     "venue": {"type": ["string", "null"]},
     "year": {"type": ["integer", "null"], "minimum": 1900, "maximum": 2200},
-    "source": {"type": "object", "required": ["url", "local_pdf"], "properties": {"url": {"type": ["string", "null"]}, "local_pdf": {"type": "string"}}, "additionalProperties": false},
+    "source": {
+      "type": "object",
+      "required": ["url", "local_pdf"],
+      "properties": {
+        "url": {"type": ["string", "null"]},
+        "local_pdf": {"type": ["string", "null"]},
+        "zotero": {
+          "type": "object",
+          "required": ["server_id", "library", "item_key", "item_version", "linked_at"],
+          "properties": {
+            "server_id": {"type": ["string", "null"]},
+            "library": {"type": "string", "pattern": "^(users/0|groups/[0-9]+)$"},
+            "item_key": {"type": "string", "minLength": 1},
+            "item_version": {"type": ["integer", "null"]},
+            "linked_at": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "tags": {"type": "array", "items": {"type": "string"}},
     "status": {"enum": ["unread", "skimmed", "verified"]},
     "core_operator": {"type": ["string", "null"]},

@@ -26,11 +26,25 @@ The five commands to remember are:
 
 ```text
 rf status       current question, HYP/EXP/RUN state, next action
-rf evidence     paper and pinned-code evidence
+rf evidence     Zotero-linked paper analysis and pinned-code evidence
 rf experiment   card, worktree, preflight, bounded execution
 rf run          provenance, logs, metrics, artifacts
 rf doctor       config, schemas, tools, paths, references, IDs, machines
 ```
+
+## Zotero literature boundary
+
+Zotero Desktop is the recommended authority for bibliographic metadata, collections/tags, PDFs, notes/annotations, and citation formatting. ResearchFlow connects to Zotero's official loopback Local API with read-only `GET` requests and stores only a minimal source reference plus project-specific analysis and evidence relationships.
+
+```powershell
+rf evidence zotero configure --library users/0
+rf evidence zotero status
+rf evidence zotero search "visual navigation"
+rf evidence zotero show ITEMKEY
+rf evidence zotero link ITEMKEY
+```
+
+Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
 
 For a configured SSH target, the bounded remote lifecycle is:
 
@@ -129,8 +143,8 @@ python -m pytest tests/test_e2e_toy.py -q
 - SSH submit/status/collect/register has been validated against a real server with a deterministic `TEST / MOCK`, CPU-only fixture. This proves the remote workflow and provenance path, not GPU scheduling quality or any scientific result.
 - A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
 - Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
-- Literature analysis is deliberately manual/agent-assisted; no PDF parser, citation engine, embeddings, or vector database is included.
+- Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow has no built-in PDF parser, embeddings, or vector database.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 
-The recommended next milestone is explicit remote cancellation and retention/cleanup policy, followed by packaging the CLI for ordinary local installation. These close operational gaps without changing the file-first architecture.
+The recommended next literature milestone is a bounded discovery-to-reading workflow: search external scholarly indexes, deduplicate candidates against Zotero, let Zotero own the accepted item/PDF, and then link selected items into ResearchFlow analysis. Remote cancellation and retention policy remain separate operational work.

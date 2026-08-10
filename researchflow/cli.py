@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from .config import init_config, load_config, save_config
+from .config import configure_zotero, init_config, load_config, save_config
 from .daily import create_daily_log
 from .doctor import run_doctor
 from .errors import ResearchFlowError
@@ -91,6 +91,34 @@ def parser() -> argparse.ArgumentParser:
             search_e.add_argument("query")
     search = evidence_actions.add_parser("search")
     search.add_argument("query")
+    zotero = evidence_actions.add_parser("zotero", help="read from the Zotero-owned literature library")
+    zotero_actions = zotero.add_subparsers(dest="action", required=True)
+    zotero_configure = zotero_actions.add_parser("configure")
+    zotero_configure.add_argument("--base-url", default="http://127.0.0.1:23119/api")
+    zotero_configure.add_argument("--library", default="users/0")
+    zotero_actions.add_parser("status")
+    zotero_actions.add_parser("libraries")
+    zotero_collections = zotero_actions.add_parser("collections")
+    zotero_collections.add_argument("--library")
+    zotero_search = zotero_actions.add_parser("search")
+    zotero_search.add_argument("query")
+    zotero_search.add_argument("--library")
+    zotero_search.add_argument("--collection")
+    zotero_search.add_argument("--tag")
+    zotero_search.add_argument("--limit", type=int, default=25)
+    zotero_show = zotero_actions.add_parser("show")
+    zotero_show.add_argument("item_key")
+    zotero_show.add_argument("--library")
+    zotero_link = zotero_actions.add_parser("link")
+    zotero_link.add_argument("item_key")
+    zotero_link.add_argument("--library")
+    zotero_refresh = zotero_actions.add_parser("refresh")
+    zotero_refresh.add_argument("paper_id")
+    zotero_bib = zotero_actions.add_parser("bibliography")
+    zotero_bib.add_argument("item_keys", nargs="+")
+    zotero_bib.add_argument("--library")
+    zotero_bib.add_argument("--style", default="apa")
+    zotero_bib.add_argument("--locale", default="en-US")
 
     memory = commands.add_parser("memory", help="manage observations and decisions")
     memory_types = memory.add_subparsers(dest="memory_kind", required=True)
@@ -161,6 +189,31 @@ def execute(args: argparse.Namespace) -> int:
         store = project.evidence
         if args.evidence_kind == "search":
             dump(store.search(args.query))
+        elif args.evidence_kind == "zotero":
+            from .zotero import ZoteroClient, zotero_settings
+            if args.action == "configure":
+                dump(configure_zotero(args.base_url, args.library))
+                return 0
+            settings = zotero_settings()
+            client = ZoteroClient(settings["base_url"], getattr(args, "library", None) or settings["library"])
+            if args.action == "status":
+                dump({"authority": settings["authority"], **client.status()})
+            elif args.action == "libraries":
+                dump(client.libraries())
+            elif args.action == "collections":
+                dump(client.collections())
+            elif args.action == "search":
+                dump(client.search(args.query, args.collection, args.tag, args.limit))
+            elif args.action == "show":
+                dump(client.context(args.item_key))
+            elif args.action == "link":
+                print(store.link_zotero(client, args.item_key))
+            elif args.action == "refresh":
+                source = store.show(args.paper_id)["metadata"].get("source", {}).get("zotero", {})
+                refresh_client = ZoteroClient(settings["base_url"], source.get("library", settings["library"]))
+                print(store.refresh_zotero(args.paper_id, refresh_client))
+            else:
+                print(client.bibliography(args.item_keys, args.style, args.locale))
         elif args.action == "list":
             dump(store.list(args.evidence_kind))
         elif args.action == "show":

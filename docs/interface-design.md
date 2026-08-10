@@ -15,6 +15,7 @@ rf status
 rf evidence paper add|list|show
 rf evidence repo add|list|show|search
 rf evidence search QUERY
+rf evidence zotero configure|status|libraries|collections|search|show|bibliography|link|refresh
 rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
@@ -46,7 +47,7 @@ Global configuration contains only the research root, defaults, machine aliases,
 
 ## Record contracts
 
-JSON Schemas define Project, Observation, Hypothesis, Experiment, Run, and Decision. Paper and RepositoryEvidence use validated YAML/frontmatter records. Markdown records combine YAML frontmatter with fixed human-readable sections.
+JSON Schemas define Project, Observation, Hypothesis, Experiment, Run, and Decision. Paper and RepositoryEvidence use validated YAML/frontmatter records. A Zotero-linked Paper stores a minimal bibliographic snapshot and stable source reference but no copied PDF. Markdown records combine YAML frontmatter with fixed human-readable sections.
 
 Experiment cards are authoritative; `experiments/registry.jsonl` records append-only state events. Each run has an authoritative `runs/<RUN-ID>/run.yaml`; the run registry is an index/event log.
 
@@ -57,3 +58,5 @@ Each `skills/<name>/SKILL.md` declares purpose, required inputs/retrieval, prohi
 ## No duplicate interfaces
 
 `memory observation add` and `memory decision add` remain grouped instead of adding `observe`/`decide` aliases. State changes use one `experiment transition` primitive; `smoke`, `pilot`, and `full` are execution commands with gate checks, not aliases for arbitrary transitions.
+
+Zotero operations stay under `evidence zotero`: Zotero owns retrieval, organization, attachment/annotation context, and citation formatting; ResearchFlow `link` is the single handoff into a `PAPER-*` analysis.
