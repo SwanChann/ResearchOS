@@ -117,6 +117,16 @@ def parser() -> argparse.ArgumentParser:
         if kind == "repo":
             search_e = actions.add_parser("search")
             search_e.add_argument("query")
+    matrix = evidence_actions.add_parser("matrix", help="manage the structured cross-paper literature matrix")
+    matrix_actions = matrix.add_subparsers(dest="action", required=True)
+    matrix_init = matrix_actions.add_parser("init")
+    matrix_init.add_argument("--title", required=True)
+    matrix_init.add_argument("--scope", required=True)
+    matrix_actions.add_parser("validate")
+    matrix_add = matrix_actions.add_parser("add")
+    matrix_add.add_argument("entry", type=Path, help="YAML entry containing one verified paper and every matrix axis")
+    matrix_actions.add_parser("render")
+    matrix_actions.add_parser("show")
     search = evidence_actions.add_parser("search")
     search.add_argument("query")
     zotero = evidence_actions.add_parser("zotero", help="read from the Zotero-owned literature library")
@@ -217,6 +227,19 @@ def execute(args: argparse.Namespace) -> int:
         store = project.evidence
         if args.evidence_kind == "search":
             dump(store.search(args.query))
+        elif args.evidence_kind == "matrix":
+            from .literature import LiteratureMatrixStore
+            matrix_store = LiteratureMatrixStore(project)
+            if args.action == "init":
+                print(matrix_store.initialize(args.title, args.scope))
+            elif args.action == "validate":
+                dump(matrix_store.validate())
+            elif args.action == "add":
+                print(matrix_store.add_entry_file(args.entry))
+            elif args.action == "render":
+                print(matrix_store.render())
+            else:
+                dump(matrix_store.load())
         elif args.evidence_kind == "zotero":
             from .zotero import ZoteroClient, zotero_settings
             if args.action == "configure":

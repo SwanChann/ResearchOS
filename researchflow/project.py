@@ -13,6 +13,7 @@ from .io import atomic_text, read_markdown_record, read_yaml, utc_now, write_yam
 from .schema import validate_record
 
 WORKSPACE_DIRS = (
+    ".research",
     "memory/observations", "memory/hypotheses", "memory/decisions",
     "evidence/papers/pdf", "evidence/papers/analysis",
     "evidence/repos/manifests", "evidence/repos/notes",

@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "evidence_ref": {
+      "type": "object",
+      "required": ["pages", "claim_ids", "locator"],
+      "properties": {
+        "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "pages": {"type": "string", "pattern": "^pp?\\.\\s*[0-9]+"},
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^C[0-9]{2}$"}
+        },
+        "locator": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "cell": {
+      "type": "object",
+      "required": ["status", "text", "evidence"],
+      "properties": {
+        "status": {"enum": ["supported", "not_reported", "not_applicable"]},
+        "text": {"type": "string", "minLength": 1},
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidence_ref"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "cross_evidence_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/evidence_ref"},
+        {"required": ["paper_id"]}
+      ]
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema_version", "id", "title", "scope", "status", "citation_basis",
+    "axes", "papers", "syntheses", "ideas", "updated_at"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^LITMATRIX-[0-9]{4}$"},
+    "title": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "status": {"enum": ["active", "frozen"]},
+    "citation_basis": {"const": "pdf_page"},
+    "axes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "group"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "label": {"type": "string", "minLength": 1},
+          "group": {"enum": ["framing", "method", "evidence", "decision"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "papers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "paper_id", "citation", "title", "year", "stable_id", "source_version",
+          "source_sha256", "role", "decision", "next_checks", "cells"
+        ],
+        "properties": {
+          "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+          "citation": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "year": {"type": ["integer", "null"]},
+          "stable_id": {"type": "string", "minLength": 1},
+          "source_version": {"type": "string", "minLength": 1},
+          "source_sha256": {"type": "string", "pattern": "^[0-9A-F]{64}$"},
+          "role": {"type": "string", "minLength": 1},
+          "decision": {"enum": ["central", "supporting", "background", "exclude"]},
+          "next_checks": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "cells": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {"$ref": "#/$defs/cell"}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "syntheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "strength", "evidence", "caveat"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^SYN-[0-9]{3}$"},
+          "statement": {"type": "string", "minLength": 1},
+          "strength": {"enum": ["analyst_inference", "paper_consensus", "paper_disagreement"]},
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/cross_evidence_ref"}
+          },
+          "caveat": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "ideas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "trigger", "mechanism", "falsification", "risks", "novelty", "evidence"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^XIDEA-[0-9]{3}$"},
+          "title": {"type": "string", "minLength": 1},
+          "trigger": {"type": "string", "minLength": 1},
+          "mechanism": {"type": "string", "minLength": 1},
+          "falsification": {"type": "string", "minLength": 1},
+          "risks": {"type": "string", "minLength": 1},
+          "novelty": {"enum": ["unchecked", "checked"]},
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/cross_evidence_ref"}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

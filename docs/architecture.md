@@ -60,4 +60,4 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 
 ## Deliberate omissions
 
-V0.3 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps only the analysis/provenance handoff until measured needs justify more infrastructure.
+V0.4 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps paper analyses and the structured cross-paper matrix, with no copied PDFs.

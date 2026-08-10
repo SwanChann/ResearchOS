@@ -44,6 +44,10 @@ rf evidence zotero show ITEMKEY
 rf evidence zotero link ITEMKEY
 # Edit the PAPER-* analysis after reading the primary PDF, then finalize it:
 rf evidence paper verify PAPER-0001 --sha256 HEX --source-version VERSION --pages N --core-operator TEXT --primary-logic TEXT --methods method-a,method-b
+# Build a reproducible cross-paper comparison after individual verification:
+rf evidence matrix init --title "Navigation literature" --scope "Verified primary PDFs"
+rf evidence matrix add .\PAPER-0001.matrix-entry.yaml
+rf evidence matrix validate
 ```
 
 Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
@@ -146,6 +150,7 @@ python -m pytest tests/test_e2e_toy.py -q
 - A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
 - Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
 - Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow supplies a page-cited deep-read template plus an explicit verification/fingerprint gate, but has no built-in PDF parser, embeddings, or vector database.
+- The cross-paper matrix has a schema, completeness/evidence validator, and deterministic Markdown renderer. Its analytical cells still require human/agent primary-source reading; the CLI does not generate scientific judgments automatically.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 

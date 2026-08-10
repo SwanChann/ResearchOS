@@ -13,6 +13,7 @@ rf init [--home PATH]
 rf project add|list|show
 rf status
 rf evidence paper add|list|show|verify
+rf evidence matrix init|add|validate|render|show
 rf evidence repo add|list|show|search
 rf evidence search QUERY
 rf evidence zotero configure|status|libraries|collections|search|show|bibliography|link|refresh
@@ -62,3 +63,5 @@ Each `skills/<name>/SKILL.md` declares purpose, required inputs/retrieval, prohi
 Zotero operations stay under `evidence zotero`: Zotero owns retrieval, organization, attachment/annotation context, and citation formatting; ResearchFlow `link` is the single handoff into a `PAPER-*` analysis.
 
 `evidence paper verify` is the explicit completion gate for a primary-source deep read. It checks the Markdown contract and records only the inspected document's fingerprint/version/page basis plus searchable analysis labels; it does not copy or mutate the Zotero-owned PDF.
+
+`evidence matrix` manages one project-level `.research/literature_matrix.md`. YAML frontmatter is the authoritative structured record; the Markdown comparison tables are a deterministic view. `add` accepts one YAML paper entry, requires a verified `PAPER-*`, rejects duplicate papers or missing/unknown axes, and validates every supported cell's page and claim references before an atomic rewrite.

@@ -75,6 +75,18 @@ def run_doctor(project_id: str | None = None) -> list[Check]:
                 checks.append(Check(f"card {card.stem}", True, "valid"))
             except ResearchFlowError as exc:
                 checks.append(Check(f"card {card.stem}", False, str(exc)))
+        matrix_path = project.root / ".research" / "literature_matrix.md"
+        if matrix_path.exists():
+            try:
+                from .literature import LiteratureMatrixStore
+                summary = LiteratureMatrixStore(project).validate()
+                checks.append(Check(
+                    f"project {candidate} literature matrix",
+                    True,
+                    f"{summary['papers']} papers x {summary['axes']} axes",
+                ))
+            except ResearchFlowError as exc:
+                checks.append(Check(f"project {candidate} literature matrix", False, str(exc)))
     duplicates = sorted({value for value in ids if ids.count(value) > 1})
     checks.append(Check("duplicate record IDs", not duplicates, ", ".join(duplicates) if duplicates else "none"))
     # GPU availability is reported by compute probe; doctor only verifies configured machine shape.

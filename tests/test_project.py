@@ -12,6 +12,7 @@ def test_project_init_creates_human_readable_workspace(rf_env):
     assert (workspace / "AGENTS.md").is_file()
     assert (workspace / "KNOWLEDGE.md").is_file()
     assert (workspace / "memory/current-state.md").is_file()
+    assert (workspace / ".research").is_dir()
     assert (workspace / "policy.yaml").is_file()
     assert (workspace / "skills/retrieve-before-reason/SKILL.md").is_file()
     assert (workspace / "skills/paper-deep-read/SKILL.md").is_file()

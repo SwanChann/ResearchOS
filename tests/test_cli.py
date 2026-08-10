@@ -101,3 +101,10 @@ def test_paper_verify_cli_arguments_do_not_shadow_top_level_route():
     ])
     assert args.root_command == "evidence"
     assert args.action == "verify"
+
+
+def test_literature_matrix_cli_arguments_route_to_matrix():
+    args = parser().parse_args(["evidence", "matrix", "add", "entry.yaml"])
+    assert args.root_command == "evidence"
+    assert args.evidence_kind == "matrix"
+    assert args.action == "add"
