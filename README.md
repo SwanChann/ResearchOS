@@ -29,7 +29,7 @@ rf status       current question, HYP/EXP/RUN state, next action
 rf evidence     Zotero-linked paper analysis and pinned-code evidence
 rf experiment   card, worktree, preflight, bounded execution
 rf run          provenance, logs, metrics, artifacts
-rf doctor       config, schemas, tools, paths, references, IDs, machines
+rf doctor       local config, schemas, tools, paths, references, IDs
 ```
 
 ## Zotero literature boundary
@@ -83,6 +83,17 @@ The server must already contain the project repository at `<workspace-root>/repo
 ```
 
 No database is authoritative. Datasets and large checkpoints stay in their configured local/remote locations; run records contain references and hashes where practical.
+
+## Use from any folder or a new chat
+
+ResearchFlow resolves projects from its global configuration, not from the current working directory. Use an explicit project ID so records cannot accidentally enter the wrong topic:
+
+```powershell
+& F:\codespace\ResearchOS\.venv\Scripts\rf.exe project show embodied-nav
+& F:\codespace\ResearchOS\.venv\Scripts\rf.exe --project embodied-nav status
+```
+
+`project show` prints the project workspace and the three startup files a new agent must read. A new chat should not rely on the old conversation: give it the project ID, ask it to read those files, then run `status`. See [cross-folder and new-session usage](docs/cross-folder-session-usage.md) for a copyable prompt and the procedure for adding a separate literature topic.
 
 ## Human workflow: problem to decision
 
@@ -144,6 +155,9 @@ python -m pytest tests/test_e2e_toy.py -q
 - [CLI reference](docs/cli.md)
 - [Schemas](docs/schemas.md)
 - [Development](docs/development.md)
+- [Definition of Done audit](docs/definition-of-done-audit.md)
+- [Cross-folder and new-session usage](docs/cross-folder-session-usage.md)
+- [System-build handoff](docs/handoffs/researchflow-system-build.md)
 
 ## Current limitations
 
@@ -155,4 +169,4 @@ python -m pytest tests/test_e2e_toy.py -q
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 
-The recommended next literature milestone is a bounded discovery-to-reading workflow: search external scholarly indexes, deduplicate candidates against Zotero, let Zotero own the accepted item/PDF, and then link selected items into ResearchFlow analysis. Remote cancellation and retention policy remain separate operational work.
+The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, additional deep reads, remote cancellation, and retention automation are optional future workflows and do not block the V0.4.2 system Definition of Done.

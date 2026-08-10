@@ -202,7 +202,12 @@ def parser() -> argparse.ArgumentParser:
     add_compute_parser(commands)
 
     commands.add_parser("daily", help="write a decision-relevant daily log")
-    commands.add_parser("doctor", help="check configuration and project integrity")
+    doctor = commands.add_parser("doctor", help="check configuration and project integrity")
+    doctor.add_argument(
+        "--probe-machines",
+        action="store_true",
+        help="explicitly perform live local/SSH machine probes (may contact remote hosts)",
+    )
     return root
 
 
@@ -221,7 +226,16 @@ def execute(args: argparse.Namespace) -> int:
         elif args.action == "list":
             print("\n".join(list_projects()) or "No projects.")
         else:
-            dump(choose_project(args.id or args.project).data)
+            selected = choose_project(args.id or args.project)
+            summary = dict(selected.data)
+            summary["workspace"] = str(selected.root)
+            summary["startup_files"] = [
+                str(selected.root / "AGENTS.md"),
+                str(selected.root / "KNOWLEDGE.md"),
+                str(selected.root / "memory" / "current-state.md"),
+            ]
+            summary["explicit_project_command"] = f"rf --project {selected.data['id']} status"
+            dump(summary)
         return 0
     project_commands = {"status", "evidence", "memory", "hypothesis", "experiment", "run", "daily"}
     project = choose_project(args.project) if args.root_command in project_commands else None
@@ -308,7 +322,7 @@ def execute(args: argparse.Namespace) -> int:
     elif args.root_command == "daily":
         print(create_daily_log(project))
     elif args.root_command == "doctor":
-        checks = run_doctor(args.project)
+        checks = run_doctor(args.project, probe_machines=args.probe_machines)
         for check in checks:
             print(f"{'OK' if check.ok else 'FAIL':4} {check.name}: {check.detail}")
         return 0 if all(check.ok for check in checks) else 1

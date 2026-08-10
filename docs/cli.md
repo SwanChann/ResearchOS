@@ -7,7 +7,8 @@ Available in the human-interface phase:
 ```text
 rf init --home PATH
 rf project add ID --repo PATH [--name NAME]
-rf project list|show
+rf project list
+rf project show [ID]
 rf status
 rf evidence paper add PDF --title TITLE [metadata]
 rf evidence paper list|show
@@ -15,6 +16,7 @@ rf evidence paper verify PAPER-ID --sha256 HEX --source-version VERSION --pages 
                          --core-operator TEXT --primary-logic TEXT --methods CSV
 rf evidence matrix init --title TITLE --scope SCOPE
 rf evidence matrix add ENTRY.yaml
+rf evidence matrix synthesize UPDATE.yaml
 rf evidence matrix validate|render|show
 rf evidence repo add --name NAME --commit SHA (--url URL | --local PATH)
 rf evidence repo list|show|search
@@ -30,14 +32,16 @@ rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
 rf daily
-rf doctor
+rf doctor [--probe-machines]
 ```
+
+`--project ID` is resolved through the global ResearchFlow configuration and is independent of the shell's current directory. `project show ID` prints the resolved workspace, the new-session startup files, and an explicit status command. Prefer explicit project selection whenever more than one topic exists.
 
 Zotero subcommands are read-only toward Zotero. Search/full-text indexing, collections/tags, attachments/annotations, and CSL formatting remain Zotero functions. `link`, `refresh`, and `paper verify` write only ResearchFlow analysis/provenance records and never copy or modify Zotero PDFs. See [Zotero integration](zotero.md).
 
 After primary-source inspection, `paper verify` validates the required page-cited deep-read sections, marks the paper `verified`, records the inspected PDF hash/version/page count, and synchronizes method/status fields into the paper index. Here `verified` means checked against that exact document, not independently reproduced.
 
-The literature matrix lives at `.research/literature_matrix.md`. Its YAML frontmatter is authoritative and its Markdown tables are generated. `matrix add` is append-only for paper IDs: the entry must cover every configured comparison axis, supported cells must carry `C##` plus PDF-page evidence, and the referenced paper fingerprint must still match its verified deep read. `matrix validate` detects missing/unknown axes, duplicates, stale fingerprints, unverified papers, and broken claim references.
+The literature matrix lives at `.research/literature_matrix.md`. Its YAML frontmatter is authoritative and its Markdown tables are generated. `matrix add` is append-only for paper IDs: the entry must cover every configured comparison axis, supported cells must carry `C##` plus PDF-page evidence, and the referenced paper fingerprint must still match its verified deep read. `matrix synthesize` atomically applies a schema-checked cross-paper synthesis/idea update and rejects broken paper or claim references. `matrix validate` detects missing/unknown axes, duplicates, stale fingerprints, unverified papers, and broken claim references.
 
 Experiment and run commands:
 
@@ -75,3 +79,5 @@ rf compute collect NAME RUN-000001 --project-id ID [--dry-run]
 Remote execution does not upload a repository, datasets, checkpoints, or videos. The server repository at `<workspace-root>/repos/<project-id>` must already contain the experiment commit. Job transitions are preserved in remote `events.jsonl`; repeated status checks may also append duplicate observed states to the coordinator ledger.
 
 Compute commands do not require a default research project. A live `compute probe` returns a non-zero exit code when the target is unreachable; `--dry-run` remains successful without opening a connection.
+
+`rf doctor` performs local integrity checks by default and reports configured machines as skipped. `rf doctor --probe-machines` is an explicit live operation that may execute `nvidia-smi` locally or contact configured SSH hosts. Use it only with current authorization and the required network/VPN state.

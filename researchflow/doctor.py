@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from .config import config_path, load_config, research_home
 from .errors import ResearchFlowError
-from .project import ResearchProject, list_projects
+from .project import ResearchProject, SKILL_NAMES, list_projects, parse_current_state
 from .schema import schema_dir, validate_record
 from .io import read_yaml
 from .records import broken_references
@@ -23,7 +22,18 @@ class Check:
     detail: str
 
 
-def run_doctor(project_id: str | None = None) -> list[Check]:
+REQUIRED_CURRENT_STATE_SECTIONS = {
+    "Main Research Question",
+    "Current Stage",
+    "Active Hypothesis",
+    "Active Experiment",
+    "Current Best Baseline",
+    "Open Blockers",
+    "Next Action",
+}
+
+
+def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> list[Check]:
     checks: list[Check] = []
     try:
         config = load_config()
@@ -47,6 +57,27 @@ def run_doctor(project_id: str | None = None) -> list[Check]:
             continue
         checks.append(Check(f"project {candidate} path", project.root.is_dir(), str(project.root)))
         checks.append(Check(f"project {candidate} repo", project.repo.is_dir(), str(project.repo)))
+        startup_files = [project.root / "AGENTS.md", project.root / "KNOWLEDGE.md", project.root / "memory" / "current-state.md"]
+        missing_startup = [str(path) for path in startup_files if not path.is_file()]
+        checks.append(Check(
+            f"project {candidate} session startup",
+            not missing_startup,
+            "valid" if not missing_startup else f"missing: {', '.join(missing_startup)}",
+        ))
+        if not missing_startup:
+            state = parse_current_state(project.root / "memory" / "current-state.md")
+            missing_sections = sorted(REQUIRED_CURRENT_STATE_SECTIONS - set(state))
+            checks.append(Check(
+                f"project {candidate} current state contract",
+                not missing_sections,
+                "valid" if not missing_sections else f"missing sections: {', '.join(missing_sections)}",
+            ))
+        missing_skills = [name for name in SKILL_NAMES if not (project.root / "skills" / name / "SKILL.md").is_file()]
+        checks.append(Check(
+            f"project {candidate} skills",
+            not missing_skills,
+            "valid" if not missing_skills else f"missing: {', '.join(missing_skills)}",
+        ))
         if project.repo.is_dir() and (project.repo / ".git").exists():
             try:
                 inside = git(project.repo, "rev-parse", "--is-inside-work-tree")
@@ -95,10 +126,13 @@ def run_doctor(project_id: str | None = None) -> list[Check]:
     for name in config.get("machines", {}):
         if name in invalid_machines:
             continue
+        if not probe_machines:
+            checks.append(Check(f"machine {name} live probe", True, "skipped; use --probe-machines with current authorization"))
+            continue
         try:
             probe = probe_machine(name)
             gpu = probe.get("gpu") or probe.get("stdout") or "no GPU reported"
             checks.append(Check(f"machine {name} connectivity/GPU", bool(probe.get("reachable")), str(gpu)))
-        except (ResearchFlowError, subprocess.SubprocessError) as exc:
+        except (ResearchFlowError, OSError) as exc:
             checks.append(Check(f"machine {name} connectivity/GPU", False, str(exc)))
     return checks

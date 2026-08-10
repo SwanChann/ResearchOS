@@ -13,7 +13,7 @@ rf init [--home PATH]
 rf project add|list|show
 rf status
 rf evidence paper add|list|show|verify
-rf evidence matrix init|add|validate|render|show
+rf evidence matrix init|add|synthesize|validate|render|show
 rf evidence repo add|list|show|search
 rf evidence search QUERY
 rf evidence zotero configure|status|libraries|collections|search|show|bibliography|link|refresh
@@ -24,10 +24,12 @@ rf experiment new|show|transition|approve|preflight|worktree|smoke|pilot|full
 rf run show|logs|artifacts
 rf compute add|list|probe|status|jobs|lock|unlock|plan|submit|job|collect
 rf daily
-rf doctor
+rf doctor [--probe-machines]
 ```
 
 Commands that create worktrees, execute runs, collect artifacts, touch remote machines, or unlock compute expose `--dry-run` where meaningful. Remote submit creates a detached worktree from a pinned commit; remote collect registers only bounded provenance artifacts. Full runs and force-unlock require explicit confirmation flags.
+
+Ordinary `doctor` is a local integrity check. Live local/SSH machine probes require the explicit `--probe-machines` flag so an audit cannot contact external systems as a hidden side effect. `project show` exposes the resolved workspace and new-session startup files; global `--project ID` selection works independently of the current working directory.
 
 ## Python API
 

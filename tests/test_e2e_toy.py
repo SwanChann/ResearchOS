@@ -4,9 +4,9 @@ import subprocess
 from pathlib import Path
 
 from researchflow.experiments import worktree_path
-from researchflow.gitops import create_worktree
+from researchflow.gitops import create_worktree, head
 from researchflow.project import ResearchProject, add_project
-from researchflow.records import add_decision, add_hypothesis, add_observation
+from researchflow.records import add_decision, add_hypothesis, add_observation, broken_references
 from researchflow.runs import execute_local_run
 
 
@@ -25,7 +25,20 @@ def test_complete_toy_research_loop_is_reproducible(rf_env):
 
     add_project("toy", rf_env["repo"], "Toy Research (TEST)")
     project = ResearchProject.open("toy")
-    initial = add_observation(project, "TEST baseline output", "The deterministic fixture uses MULTIPLIER=1.", observation_type="project_observation")
+    repository = project.evidence.add_repo(
+        "TEST fixture repository",
+        head(project.repo),
+        local=project.repo,
+        tags=["TEST", "MOCK"],
+        notes="Deterministic fixture only; not scientific evidence.",
+    )
+    initial = add_observation(
+        project,
+        "TEST baseline output",
+        "The deterministic fixture uses MULTIPLIER=1.",
+        [repository],
+        observation_type="project_observation",
+    )
     hypothesis = add_hypothesis(project, "TEST multiplier", "Setting MULTIPLIER=2 doubles the fixture score.", [initial], falsification="Input 3 does not produce score 6.")
     experiment = project.experiments.create(
         hypothesis, "TEST deterministic multiplier", "Does the fixture score double?",
@@ -75,3 +88,12 @@ def test_complete_toy_research_loop_is_reproducible(rf_env):
     status = project.status()
     assert status["latest_experiment"]["status"] == "ACCEPTED"
     assert status["latest_decision"] == decision
+
+    reopened = ResearchProject.open("toy")
+    recovered_status = reopened.status()
+    assert recovered_status["latest_experiment"]["status"] == "ACCEPTED"
+    assert recovered_status["latest_decision"] == decision
+    assert recovered_status["last_result"]["id"] == full["id"]
+    assert broken_references(reopened) == []
+    assert (reopened.root / "AGENTS.md").read_text(encoding="utf-8").startswith("# Project Agent Protocol")
+    assert "memory/current-state.md" in (reopened.root / "KNOWLEDGE.md").read_text(encoding="utf-8")

@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+
 from researchflow.cli import _configure_utf8_output, main, parser
 from researchflow.project import ResearchProject
 from researchflow.records import add_decision, add_observation
@@ -10,6 +14,71 @@ def test_cli_project_memory_and_doctor(rf_env, capsys):
     output = capsys.readouterr().out
     assert "OBS-0001" in output
     assert main(["doctor"]) == 0
+
+
+def test_project_show_exposes_cross_session_startup_paths(rf_env, capsys):
+    assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
+    assert main(["project", "show", "toy"]) == 0
+    output = capsys.readouterr().out
+    assert f"workspace: {rf_env['home'] / '.projects' / 'toy'}" in output
+    assert "AGENTS.md" in output
+    assert "KNOWLEDGE.md" in output
+    assert "memory\\current-state.md" in output or "memory/current-state.md" in output
+    assert "rf --project toy status" in output
+
+
+def test_cli_status_works_from_unrelated_working_directory(rf_env, tmp_path):
+    assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
+    unrelated = tmp_path / "unrelated-folder"
+    unrelated.mkdir()
+    environment = os.environ.copy()
+    environment["PYTHONUTF8"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-m", "researchflow.cli", "--project", "toy", "status"],
+        cwd=unrelated,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "id: toy" in result.stdout
+    assert str(rf_env["repo"]) in result.stdout
+
+
+def test_doctor_skips_live_machine_probe_without_explicit_flag(rf_env, monkeypatch, capsys):
+    assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
+    assert main([
+        "compute", "add", "offline", "--type", "ssh", "--host", "offline",
+        "--workspace-root", "/tmp/researchflow",
+    ]) == 0
+
+    def unexpected_probe(name):
+        raise AssertionError(f"unexpected live probe: {name}")
+
+    monkeypatch.setattr("researchflow.doctor.probe_machine", unexpected_probe)
+    assert main(["doctor"]) == 0
+    output = capsys.readouterr().out
+    assert "machine offline live probe" in output
+    assert "skipped" in output
+
+
+def test_doctor_live_probe_requires_explicit_flag(rf_env, monkeypatch, capsys):
+    assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
+    assert main([
+        "compute", "add", "fixture", "--type", "ssh", "--host", "fixture",
+        "--workspace-root", "/tmp/researchflow",
+    ]) == 0
+    called = []
+
+    def fixture_probe(name):
+        called.append(name)
+        return {"machine": name, "reachable": True, "gpu": "TEST / MOCK GPU"}
+
+    monkeypatch.setattr("researchflow.doctor.probe_machine", fixture_probe)
+    assert main(["doctor", "--probe-machines"]) == 0
+    assert called == ["fixture"]
+    assert "TEST / MOCK GPU" in capsys.readouterr().out
 
 
 def test_cli_error_has_fix_context(rf_env, capsys):

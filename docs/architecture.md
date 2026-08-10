@@ -54,10 +54,11 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 - Research lifecycle and compute-job lifecycle are separate.
 - Heavy jobs require a single-GPU lock; stale locks are detectable, not silently removed.
 - Remote operations and artifact collection support dry-run.
+- Ordinary integrity checks are local-only; live machine probes require an explicit flag.
 - Remote jobs use an atomic lock directory on the server and append-only state events; this is cooperative coordination, not an operating-system GPU reservation.
 - Secrets stay in environment variables, SSH configuration, or credential stores.
 - The Zotero adapter accepts loopback `/api` URLs only, implements `GET` only, and never requests or stores a write key.
 
 ## Deliberate omissions
 
-V0.4 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps paper analyses and the structured cross-paper matrix, with no copied PDFs.
+V0.4.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps paper analyses and the structured cross-paper matrix, with no copied PDFs.

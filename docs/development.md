@@ -17,4 +17,4 @@ Runtime dependencies are intentionally limited to PyYAML (safe, readable YAML re
 
 Each material phase is implemented, tested, diff-checked, simplified, documented, and committed separately. Tests use temporary homes/repositories and mark all generated metrics as `TEST / MOCK`. No test needs a GPU, network connection, or real research project.
 
-Run focused tests while editing, then `python -m pytest`. Use `git diff --check` and inspect `git status --short` before committing. The E2E contract is `tests/test_e2e_toy.py`.
+Run focused tests while editing, then `python -m pytest`. Use `git diff --check` and inspect `git status --short` before committing. The E2E contract is `tests/test_e2e_toy.py`: it creates repository Evidence, links the full Observation → Hypothesis → Experiment → Run → Observation → Decision chain, executes deterministic smoke/pilot/full levels, reopens the project, and verifies references and recovered state. A separate CLI regression runs `status` from an unrelated working directory.
