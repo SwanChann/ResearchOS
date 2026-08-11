@@ -2,6 +2,7 @@
 
 This file indexes ResearchFlow's own design knowledge; it is not a project research memory.
 
+- Current project delivery state: `PROJECT_STATE.md`
 - Architecture: `docs/architecture.md`
 - Concepts and epistemic boundaries: `docs/concepts.md`
 - Public contracts: `docs/interface-design.md`
