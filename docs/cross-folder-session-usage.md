@@ -15,7 +15,25 @@ $ResearchFlowCli = 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe'
 
 这里的 PowerShell 变量只在当前终端有效，不修改系统 PATH。最稳妥的规则是：凡是读写项目状态的命令都显式写 `--project <专题ID>`。这样即使以后默认项目改变，也不会把记录写入错误专题。
 
-## 新对话的恢复协议
+## 两种新对话入口
+
+| 场景 | 动作 | 是否恢复上下文 | 结果 |
+|---|---|---|---|
+| 接续已经存在的项目 | Import/continue | 是 | 读取该项目已有记录，核验当前状态后继续原工作流。 |
+| 开启全新专题 | Initialize/start | 否 | 创建新的项目 ID、独立 repo 映射和空白研究状态。 |
+
+两者都建议用入口提示词，因为 agent 需要知道本次是在“恢复”还是“初始化”。但提示词只是 agent 的启动协议；真正操作 ResearchFlow 的入口仍是 CLI，真正的持久状态仍是普通文件。
+
+“不要依赖旧对话记忆”不是要求遗忘项目历史，也不是禁止使用已有成果。它表示：旧聊天内容和模型记忆不能直接当作当前事实。agent 应先从以下持久来源重建和核验状态：
+
+- ResearchFlow 项目工作区中的 `AGENTS.md`、`KNOWLEDGE.md`、`memory/current-state.md` 及相关记录；
+- `rf status` 和其他只读查询的当前输出；
+- 独立研究代码仓库的当前 Git HEAD、分支和 clean/dirty 状态；
+- 当任务涉及论文主张时，Zotero 条目、已验证深读记录和必要的原始 PDF。
+
+因此，此前“只依靠项目文件恢复上下文”的说法过强。准确表述是：**不依赖聊天历史，通过 ResearchFlow 持久状态加当前外部事实重建上下文。**
+
+## 接续已经存在的项目
 
 先运行：
 
@@ -23,20 +41,7 @@ $ResearchFlowCli = 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe'
 & 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe' project show embodied-nav
 ```
 
-把下面内容粘贴到新对话；如果专题不是 `embodied-nav`，只替换项目 ID：
-
-```text
-请继续 ResearchFlow 项目 embodied-nav，不要依赖旧对话记忆。
-先运行：
-F:\codespace\ResearchOS\.venv\Scripts\rf.exe project show embodied-nav
-然后按该命令输出的路径依次读取 AGENTS.md、KNOWLEDGE.md、memory/current-state.md，
-再运行：
-F:\codespace\ResearchOS\.venv\Scripts\rf.exe --project embodied-nav status
-
-把 Zotero 视为书目、PDF、集合、标签、批注和引用格式的唯一主库；
-ResearchFlow 只保存专题相关的精读分析、页码证据、跨论文比较、Idea 和研究决策。
-先报告已验证的当前状态和下一项建议，不要自动进行远端操作、全文批量下载、GPU 运行、清理或 Zotero 写入。
-```
+复制规范入口：[接续已经存在的项目](prompts/continue-existing-project.md)。把其中的 `<PROJECT_ID>` 替换为 `embodied-nav`，需要时填写具体 workstream 或本轮任务。
 
 三个启动文件各有不同职责：
 
@@ -44,9 +49,11 @@ ResearchFlow 只保存专题相关的精读分析、页码证据、跨论文比�
 - `KNOWLEDGE.md`：证据、论文、矩阵和记录的索引。
 - `memory/current-state.md`：当前问题、阶段、阻塞项和下一步。
 
-聊天记录不是恢复依据；以上文件和 `rf status` 才是。
+聊天记录可以帮助定位，但不是当前状态的权威证据。项目文件、实时 CLI/Git 状态和任务相关原始证据共同构成恢复依据。
 
 ## 为另一个专题建立独立文献项目
+
+复制规范入口：[开启全新专题](prompts/start-new-topic.md)。这份提示词会先检查项目 ID 和 repo 路径是否冲突，再初始化新状态，不会复用或覆盖 `embodied-nav`。
 
 不要把不同专题都塞进 `embodied-nav`。先准备一个独立的本地目录；如果未来会进入实验阶段，建议从一开始就把它建成独立 Git 仓库。然后注册一个稳定且唯一的项目 ID：
 

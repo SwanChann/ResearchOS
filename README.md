@@ -93,7 +93,7 @@ ResearchFlow resolves projects from its global configuration, not from the curre
 & F:\codespace\ResearchOS\.venv\Scripts\rf.exe --project embodied-nav status
 ```
 
-`project show` prints the project workspace and the three startup files a new agent must read. A new chat should not rely on the old conversation: give it the project ID, ask it to read those files, then run `status`. See [cross-folder and new-session usage](docs/cross-folder-session-usage.md) for a copyable prompt and the procedure for adding a separate literature topic.
+`project show` prints the project workspace and the three startup files a new agent must read. A new chat treats previous chat/model memory as a locator, not as verified project state: it rebuilds the current state from durable records, current Git state, and task-relevant primary evidence. See [cross-folder and new-session usage](docs/cross-folder-session-usage.md), [continue an existing project](docs/prompts/continue-existing-project.md), and [start a new topic](docs/prompts/start-new-topic.md).
 
 ## Human workflow: problem to decision
 
@@ -157,6 +157,8 @@ python -m pytest tests/test_e2e_toy.py -q
 - [Development](docs/development.md)
 - [Definition of Done audit](docs/definition-of-done-audit.md)
 - [Cross-folder and new-session usage](docs/cross-folder-session-usage.md)
+- [Prompt: continue an existing project](docs/prompts/continue-existing-project.md)
+- [Prompt: start a new topic](docs/prompts/start-new-topic.md)
 - [System-build handoff](docs/handoffs/researchflow-system-build.md)
 
 ## Current limitations

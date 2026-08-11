@@ -19,6 +19,7 @@ Maintain a local-first research control plane that persists Evidence, Observatio
 - `rf doctor` is local-only by default. `--probe-machines` is required for live local/SSH probes.
 - `project show ID` prints the resolved workspace and startup files.
 - An explicit `rf --project ID ...` invocation works independently of the current directory.
+- Two canonical new-chat entry prompts distinguish continuing an existing project from initializing a new topic.
 - Zotero owns bibliography/PDFs; ResearchFlow owns project-specific analysis and evidence relationships.
 
 ## Files to read first
@@ -27,7 +28,8 @@ Maintain a local-first research control plane that persists Evidence, Observatio
 2. `F:\codespace\ResearchOS\KNOWLEDGE.md`
 3. `F:\codespace\ResearchOS\docs\definition-of-done-audit.md`
 4. `F:\codespace\ResearchOS\docs\cross-folder-session-usage.md`
-5. The selected project's `AGENTS.md`, `KNOWLEDGE.md`, and `memory/current-state.md` printed by `rf project show ID`
+5. `F:\codespace\ResearchOS\docs\prompts\continue-existing-project.md` or `docs\prompts\start-new-topic.md`, according to the requested mode
+6. The selected project's `AGENTS.md`, `KNOWLEDGE.md`, and `memory/current-state.md` printed by `rf project show ID`
 
 ## Boundaries and unresolved optional work
 
@@ -56,7 +58,8 @@ The last command is local-only unless `--probe-machines` is explicitly added.
 ```text
 继续 F:\codespace\ResearchOS 的 ResearchFlow system-build 工作流，不要依赖旧对话记忆。
 先读取仓库 AGENTS.md、KNOWLEDGE.md、docs/definition-of-done-audit.md、
-docs/cross-folder-session-usage.md 和 docs/handoffs/researchflow-system-build.md。
+docs/cross-folder-session-usage.md、docs/prompts/continue-existing-project.md
+和 docs/handoffs/researchflow-system-build.md。
 先运行 git rev-parse --show-toplevel、git status --short，核验当前提交和未提交改动。
 若任务针对 embodied-nav，再运行：
 F:\codespace\ResearchOS\.venv\Scripts\rf.exe project show embodied-nav
