@@ -58,6 +58,32 @@ def dump(value: Any) -> None:
         print(yaml.safe_dump(value, sort_keys=False, allow_unicode=True).rstrip())
 
 
+def project_summary(selected: ResearchProject) -> dict[str, Any]:
+    from .gitops import inspect_git_state
+    from .snapshot import default_snapshot_dir, list_snapshots
+    summary = dict(selected.data)
+    summary["workspace"] = str(selected.root)
+    summary["independent_repo"] = str(selected.repo)
+    summary["repo_state"] = inspect_git_state(selected.repo).as_dict()
+    summary["startup_files"] = [
+        str(selected.root / "AGENTS.md"),
+        str(selected.root / "KNOWLEDGE.md"),
+        str(selected.root / "memory" / "current-state.md"),
+    ]
+    snapshots = [item for item in list_snapshots(selected) if item.get("valid")]
+    summary["recovery"] = {
+        "snapshot_count": len(snapshots),
+        "default_snapshot_directory": str(default_snapshot_dir(selected)),
+        "git_checkpoint_available": summary["repo_state"]["recoverable_checkpoint"],
+        "external_assets_backed_up": False,
+    }
+    summary["authority_boundary"] = (
+        "ResearchFlow workspace and independent repo are separate authorities; snapshots cover workspace records only by default."
+    )
+    summary["explicit_project_command"] = f"rf --project {selected.data['id']} status"
+    return summary
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="rf", description="Local-first Research OS")
     root.add_argument("--project", help="project ID (or use the configured default)")
@@ -79,7 +105,29 @@ def parser() -> argparse.ArgumentParser:
     show = project_actions.add_parser("show")
     show.add_argument("id", nargs="?")
 
-    commands.add_parser("status", help="show the current research state")
+    snapshot = commands.add_parser("snapshot", help="create, verify, and restore project workspace snapshots")
+    snapshot_actions = snapshot.add_subparsers(dest="action", required=True)
+    snapshot_create = snapshot_actions.add_parser("create")
+    snapshot_create.add_argument("--output-dir", type=Path)
+    snapshot_create.add_argument(
+        "--include-redacted-config", action="store_true",
+        help="include a redacted config export; raw secrets are never included",
+    )
+    snapshot_list = snapshot_actions.add_parser("list")
+    snapshot_list.add_argument("--input-dir", type=Path)
+    snapshot_show = snapshot_actions.add_parser("show")
+    snapshot_show.add_argument("snapshot", type=Path)
+    snapshot_verify = snapshot_actions.add_parser("verify")
+    snapshot_verify.add_argument("snapshot", type=Path)
+    snapshot_restore = snapshot_actions.add_parser("restore")
+    snapshot_restore.add_argument("snapshot", type=Path)
+    snapshot_restore.add_argument("--target", type=Path)
+    snapshot_restore.add_argument("--in-place", action="store_true")
+    snapshot_restore.add_argument("--yes", action="store_true")
+    snapshot_restore.add_argument("--dry-run", action="store_true")
+
+    status = commands.add_parser("status", help="show current state computed from project contracts and registries")
+    status.add_argument("--verbose", action="store_true")
 
     evidence = commands.add_parser("evidence", help="manage literature and code evidence")
     evidence_actions = evidence.add_subparsers(dest="evidence_kind", required=True)
@@ -114,6 +162,13 @@ def parser() -> argparse.ArgumentParser:
             verify_e.add_argument("--core-operator", required=True)
             verify_e.add_argument("--primary-logic", required=True)
             verify_e.add_argument("--methods", required=True)
+            review_e = actions.add_parser("review", help="record a scoped human semantic review")
+            review_e.add_argument("id")
+            review_e.add_argument("--reviewer", required=True)
+            review_e.add_argument("--decision", choices=("accepted", "revision_requested", "rejected"), required=True)
+            review_e.add_argument("--scope", required=True)
+            review_e.add_argument("--notes")
+            review_e.add_argument("--notes-path", type=Path)
         if kind == "repo":
             search_e = actions.add_parser("search")
             search_e.add_argument("query")
@@ -122,6 +177,22 @@ def parser() -> argparse.ArgumentParser:
     matrix_init = matrix_actions.add_parser("init")
     matrix_init.add_argument("--title", required=True)
     matrix_init.add_argument("--scope", required=True)
+    matrix_init.add_argument("--template", default="generic")
+    matrix_init.add_argument("--axes-file", type=Path)
+    matrix_templates = matrix_actions.add_parser("templates")
+    matrix_template_actions = matrix_templates.add_subparsers(dest="template_action", required=True)
+    matrix_template_actions.add_parser("list")
+    matrix_template_show = matrix_template_actions.add_parser("show")
+    matrix_template_show.add_argument("template")
+    matrix_axes = matrix_actions.add_parser("axes")
+    matrix_axes_actions = matrix_axes.add_subparsers(dest="axes_action", required=True)
+    matrix_axes_scaffold = matrix_axes_actions.add_parser("scaffold")
+    matrix_axes_scaffold.add_argument("path", type=Path)
+    matrix_axes_scaffold.add_argument("--template", default="generic")
+    matrix_axes_validate = matrix_axes_actions.add_parser("validate")
+    matrix_axes_validate.add_argument("path", type=Path)
+    matrix_axes_confirm = matrix_axes_actions.add_parser("confirm")
+    matrix_axes_confirm.add_argument("path", type=Path)
     matrix_actions.add_parser("validate")
     matrix_add = matrix_actions.add_parser("add")
     matrix_add.add_argument("entry", type=Path, help="YAML entry containing one verified paper and every matrix axis")
@@ -129,8 +200,17 @@ def parser() -> argparse.ArgumentParser:
     matrix_synthesize.add_argument(
         "update", type=Path, help="YAML update containing evidence-linked cross-paper syntheses and ideas"
     )
+    matrix_migrate = matrix_actions.add_parser("migrate")
+    matrix_migrate.add_argument("migration", type=Path)
+    matrix_migrate.add_argument("--dry-run", action="store_true")
     matrix_actions.add_parser("render")
     matrix_actions.add_parser("show")
+    matrix_review = matrix_actions.add_parser("review", help="record a scoped human semantic review")
+    matrix_review.add_argument("--reviewer", required=True)
+    matrix_review.add_argument("--decision", choices=("accepted", "revision_requested", "rejected"), required=True)
+    matrix_review.add_argument("--scope", required=True)
+    matrix_review.add_argument("--notes")
+    matrix_review.add_argument("--notes-path", type=Path)
     search = evidence_actions.add_parser("search")
     search.add_argument("query")
     zotero = evidence_actions.add_parser("zotero", help="read from the Zotero-owned literature library")
@@ -138,7 +218,10 @@ def parser() -> argparse.ArgumentParser:
     zotero_configure = zotero_actions.add_parser("configure")
     zotero_configure.add_argument("--base-url", default="http://127.0.0.1:23119/api")
     zotero_configure.add_argument("--library", default="users/0")
-    zotero_actions.add_parser("status")
+    zotero_status = zotero_actions.add_parser("status")
+    zotero_status.add_argument("--verbose", action="store_true")
+    zotero_doctor = zotero_actions.add_parser("doctor")
+    zotero_doctor.add_argument("--item-key")
     zotero_actions.add_parser("libraries")
     zotero_collections = zotero_actions.add_parser("collections")
     zotero_collections.add_argument("--library")
@@ -182,6 +265,64 @@ def parser() -> argparse.ArgumentParser:
     dec_show = decision_actions.add_parser("show")
     dec_show.add_argument("id")
 
+    artifact = commands.add_parser("artifact", help="register and integrity-check project research products")
+    artifact_actions = artifact.add_subparsers(dest="action", required=True)
+    artifact_add = artifact_actions.add_parser("add")
+    artifact_add.add_argument("path", type=Path)
+    artifact_add.add_argument("--title", required=True)
+    artifact_add.add_argument("--type", required=True, dest="artifact_type")
+    artifact_add.add_argument("--status", choices=("draft", "active", "verified"), default="draft")
+    artifact_add.add_argument("--authority", default="researchflow_workspace")
+    artifact_add.add_argument("--derived-from")
+    artifact_add.add_argument("--evidence")
+    artifact_add.add_argument("--schema")
+    artifact_add.add_argument("--version")
+    artifact_list = artifact_actions.add_parser("list")
+    artifact_list.add_argument("--status", choices=("draft", "active", "verified", "superseded"))
+    artifact_show = artifact_actions.add_parser("show")
+    artifact_show.add_argument("id")
+    artifact_verify = artifact_actions.add_parser("verify")
+    artifact_verify.add_argument("id", nargs="?")
+    artifact_refresh = artifact_actions.add_parser("refresh")
+    artifact_refresh.add_argument("id")
+    artifact_supersede = artifact_actions.add_parser("supersede")
+    artifact_supersede.add_argument("id")
+    artifact_supersede.add_argument("--by", required=True)
+    artifact_migrate = artifact_actions.add_parser("migrate")
+    artifact_migrate.add_argument("--scan", required=True, type=Path)
+    artifact_migrate.add_argument("--dry-run", action="store_true")
+
+    knowledge = commands.add_parser("knowledge", help="rebuild and check the generated KNOWLEDGE navigation region")
+    knowledge_actions = knowledge.add_subparsers(dest="action", required=True)
+    knowledge_rebuild = knowledge_actions.add_parser("rebuild")
+    knowledge_rebuild.add_argument("--dry-run", action="store_true")
+    knowledge_actions.add_parser("check")
+
+    scaffold = commands.add_parser("scaffold", help="create contract-oriented agent draft files")
+    scaffold_actions = scaffold.add_subparsers(dest="scaffold_kind", required=True)
+    scaffold_paper = scaffold_actions.add_parser("paper-analysis")
+    scaffold_paper.add_argument("paper_id")
+    scaffold_paper.add_argument("--output", required=True, type=Path)
+    scaffold_entry = scaffold_actions.add_parser("matrix-entry")
+    scaffold_entry.add_argument("paper_id")
+    scaffold_entry.add_argument("--output", required=True, type=Path)
+    scaffold_synthesis = scaffold_actions.add_parser("synthesis-idea")
+    scaffold_synthesis.add_argument("--output", required=True, type=Path)
+    scaffold_artifact = scaffold_actions.add_parser("artifact")
+    scaffold_artifact.add_argument("--path", required=True, type=Path)
+    scaffold_artifact.add_argument("--title", required=True)
+    scaffold_artifact.add_argument("--type", required=True, dest="artifact_type")
+    scaffold_artifact.add_argument("--output", required=True, type=Path)
+
+    preflight = commands.add_parser("preflight", help="validate a draft before a formal atomic write")
+    preflight.add_argument("kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact"))
+    preflight.add_argument("path", type=Path)
+
+    migrate = commands.add_parser("migrate", help="run explicit, previewable project record migrations")
+    migrate_actions = migrate.add_subparsers(dest="migration_kind", required=True)
+    migrate_paper = migrate_actions.add_parser("paper-verification")
+    migrate_paper.add_argument("--dry-run", action="store_true")
+
     hypothesis = commands.add_parser("hypothesis", help="manage falsifiable hypotheses")
     hypothesis_actions = hypothesis.add_subparsers(dest="action", required=True)
     hyp_new = hypothesis_actions.add_parser("new")
@@ -189,6 +330,7 @@ def parser() -> argparse.ArgumentParser:
     hyp_new.add_argument("--statement", required=True)
     hyp_new.add_argument("--observations")
     hyp_new.add_argument("--papers")
+    hyp_new.add_argument("--ideas", help="comma-separated formal XIDEA IDs from the current literature matrix")
     hyp_new.add_argument("--falsification", required=True)
     hyp_show = hypothesis_actions.add_parser("show")
     hyp_show.add_argument("id")
@@ -208,6 +350,11 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="explicitly perform live local/SSH machine probes (may contact remote hosts)",
     )
+    doctor.add_argument(
+        "--strict",
+        action="store_true",
+        help="return non-zero for WARN as well as FAIL; ordinary warnings retain exit code 0",
+    )
     return root
 
 
@@ -222,49 +369,96 @@ def execute(args: argparse.Namespace) -> int:
             if not config.get("default_project"):
                 config["default_project"] = args.id
                 save_config(config)
-            print(f"Created project {args.id}: {workspace}")
+            selected = ResearchProject.open(args.id, config)
+            result = project_summary(selected)
+            result["created_workspace"] = str(workspace)
+            result["notice"] = "No Git commit or snapshot was created automatically."
+            dump(result)
         elif args.action == "list":
             print("\n".join(list_projects()) or "No projects.")
         else:
             selected = choose_project(args.id or args.project)
-            summary = dict(selected.data)
-            summary["workspace"] = str(selected.root)
-            summary["startup_files"] = [
-                str(selected.root / "AGENTS.md"),
-                str(selected.root / "KNOWLEDGE.md"),
-                str(selected.root / "memory" / "current-state.md"),
-            ]
-            summary["explicit_project_command"] = f"rf --project {selected.data['id']} status"
-            dump(summary)
+            dump(project_summary(selected))
         return 0
-    project_commands = {"status", "evidence", "memory", "hypothesis", "experiment", "run", "daily"}
+    project_commands = {"status", "snapshot", "evidence", "memory", "artifact", "knowledge", "scaffold", "preflight", "migrate", "hypothesis", "experiment", "run", "daily"}
     project = choose_project(args.project) if args.root_command in project_commands else None
     if args.root_command == "status":
-        dump(project.status())
+        dump(project.status(verbose=args.verbose))
+    elif args.root_command == "snapshot":
+        from .snapshot import create_snapshot, list_snapshots, restore_snapshot, show_snapshot, verify_snapshot
+        if args.action == "create":
+            dump(create_snapshot(project, args.output_dir, include_redacted_config=args.include_redacted_config))
+        elif args.action == "list":
+            dump(list_snapshots(project, args.input_dir))
+        elif args.action == "show":
+            dump(show_snapshot(args.snapshot))
+        elif args.action == "verify":
+            result = verify_snapshot(args.snapshot, expected_project_id=project.data["id"])
+            dump(result)
+            return 0 if result["valid"] else 1
+        else:
+            dump(restore_snapshot(
+                project, args.snapshot, target=args.target, in_place=args.in_place,
+                yes=args.yes, dry_run=args.dry_run,
+            ))
     elif args.root_command == "evidence":
         store = project.evidence
         if args.evidence_kind == "search":
             dump(store.search(args.query))
         elif args.evidence_kind == "matrix":
-            from .literature import LiteratureMatrixStore
+            from .literature import (
+                MATRIX_TEMPLATES, LiteratureMatrixStore, axes_template, confirm_axes,
+                load_axes_file, scaffold_axes,
+            )
             matrix_store = LiteratureMatrixStore(project)
             if args.action == "init":
-                print(matrix_store.initialize(args.title, args.scope))
+                print(matrix_store.initialize(args.title, args.scope, template=args.template, axes_file=args.axes_file))
+            elif args.action == "templates":
+                if args.template_action == "list":
+                    dump([{
+                        "name": name,
+                        "version": value["version"],
+                        "description": value["description"],
+                        "axes": len(value["axes"]),
+                    } for name, value in sorted(MATRIX_TEMPLATES.items())])
+                else:
+                    dump(axes_template(args.template))
+            elif args.action == "axes":
+                if args.axes_action == "scaffold":
+                    print(scaffold_axes(args.path, args.template))
+                elif args.axes_action == "validate":
+                    dump(load_axes_file(args.path, allow_draft=True))
+                else:
+                    print(confirm_axes(args.path))
             elif args.action == "validate":
                 dump(matrix_store.validate())
             elif args.action == "add":
                 print(matrix_store.add_entry_file(args.entry))
             elif args.action == "synthesize":
                 dump(matrix_store.synthesize_file(args.update))
+            elif args.action == "migrate":
+                dump(matrix_store.migrate_axes_file(args.migration, dry_run=args.dry_run))
             elif args.action == "render":
                 print(matrix_store.render())
+            elif args.action == "review":
+                from .review import add_matrix_review
+                dump(add_matrix_review(
+                    matrix_store, reviewer=args.reviewer, decision=args.decision, scope=args.scope,
+                    notes=args.notes, notes_path=args.notes_path,
+                ))
             else:
-                dump(matrix_store.load())
+                from .review import matrix_review_status
+                record = matrix_store.load()
+                dump({"record": record, "review_status": matrix_review_status(record)})
         elif args.evidence_kind == "zotero":
-            from .zotero import ZoteroClient, zotero_settings
+            from .zotero import ZoteroClient, diagnose_zotero, zotero_settings
             if args.action == "configure":
                 dump(configure_zotero(args.base_url, args.library))
                 return 0
+            if args.action == "doctor" or (args.action == "status" and args.verbose):
+                result = diagnose_zotero(project, item_key=getattr(args, "item_key", None))
+                dump(result)
+                return 0 if result["healthy"] else 1
             settings = zotero_settings()
             client = ZoteroClient(settings["base_url"], getattr(args, "library", None) or settings["library"])
             if args.action == "status":
@@ -290,7 +484,7 @@ def execute(args: argparse.Namespace) -> int:
         elif args.action == "show":
             dump(store.show(args.id))
         elif args.evidence_kind == "paper" and args.action == "verify":
-            print(store.verify_paper(
+            paper_id = store.verify_paper(
                 args.id,
                 sha256=args.sha256,
                 source_version=args.source_version,
@@ -298,6 +492,14 @@ def execute(args: argparse.Namespace) -> int:
                 core_operator=args.core_operator,
                 primary_logic=args.primary_logic,
                 methods=csv(args.methods),
+            )
+            paper = store.show(paper_id)
+            dump({"paper_id": paper_id, "verification": paper["verification_status"]})
+        elif args.evidence_kind == "paper" and args.action == "review":
+            from .review import add_paper_review
+            dump(add_paper_review(
+                project, args.id, reviewer=args.reviewer, decision=args.decision, scope=args.scope,
+                notes=args.notes, notes_path=args.notes_path,
             ))
         elif args.action == "search":
             dump(store.search(args.query, args.evidence_kind))
@@ -313,19 +515,77 @@ def execute(args: argparse.Namespace) -> int:
             print(add_observation(project, args.title, args.text, csv(args.evidence), args.confidence))
         else:
             print(add_decision(project, args.text, args.why, csv(args.evidence)))
+    elif args.root_command == "artifact":
+        from .artifact import ArtifactStore
+        artifacts = ArtifactStore(project)
+        if args.action == "add":
+            dump(artifacts.add(
+                args.path, title=args.title, artifact_type=args.artifact_type,
+                status=args.status, authority=args.authority,
+                derived_from=csv(args.derived_from), evidence=csv(args.evidence),
+                schema=args.schema, version=args.version,
+            ))
+        elif args.action == "list":
+            dump(artifacts.list(args.status))
+        elif args.action == "show":
+            dump(artifacts.show(args.id))
+        elif args.action == "verify":
+            result = artifacts.verify(args.id)
+            dump(result)
+            return 0 if result["valid"] else 1
+        elif args.action == "refresh":
+            dump(artifacts.refresh(args.id))
+        elif args.action == "supersede":
+            dump(artifacts.supersede(args.id, args.by))
+        else:
+            dump(artifacts.migrate(args.scan, dry_run=args.dry_run))
+    elif args.root_command == "knowledge":
+        from .knowledge import KnowledgeStore
+        knowledge = KnowledgeStore(project)
+        if args.action == "rebuild":
+            dump(knowledge.rebuild(dry_run=args.dry_run))
+        else:
+            result = knowledge.check()
+            dump(result)
+            return 0 if result["valid"] else 1
+    elif args.root_command == "scaffold":
+        from .scaffold import artifact_scaffold, matrix_entry_scaffold, paper_analysis_scaffold, synthesis_idea_scaffold
+        if args.scaffold_kind == "paper-analysis":
+            print(paper_analysis_scaffold(project, args.paper_id, args.output))
+        elif args.scaffold_kind == "matrix-entry":
+            print(matrix_entry_scaffold(project, args.paper_id, args.output))
+        elif args.scaffold_kind == "synthesis-idea":
+            print(synthesis_idea_scaffold(project, args.output))
+        else:
+            print(artifact_scaffold(args.output, args.path, args.title, args.artifact_type))
+    elif args.root_command == "preflight":
+        from .scaffold import preflight
+        dump(preflight(project, args.kind, args.path))
+    elif args.root_command == "migrate":
+        from .review import migrate_paper_verification
+        dump(migrate_paper_verification(project, dry_run=args.dry_run))
     elif args.root_command == "hypothesis":
         if args.action == "show":
             metadata, body = show_record(project, args.id)
-            dump({"metadata": metadata, "body": body})
+            from .records import hypothesis_provenance_status
+            dump({"metadata": metadata, "body": body, "provenance_status": hypothesis_provenance_status(project, metadata)})
         else:
-            print(add_hypothesis(project, args.title, args.statement, csv(args.observations), csv(args.papers), args.falsification))
+            record_id = add_hypothesis(
+                project, args.title, args.statement, csv(args.observations), csv(args.papers),
+                args.falsification, ideas=csv(args.ideas),
+            )
+            metadata, _ = show_record(project, record_id)
+            from .records import hypothesis_provenance_status
+            dump({"hypothesis_id": record_id, "provenance_status": hypothesis_provenance_status(project, metadata)})
     elif args.root_command == "daily":
         print(create_daily_log(project))
     elif args.root_command == "doctor":
         checks = run_doctor(args.project, probe_machines=args.probe_machines)
         for check in checks:
-            print(f"{'OK' if check.ok else 'FAIL':4} {check.name}: {check.detail}")
-        return 0 if all(check.ok for check in checks) else 1
+            print(f"{check.status:4} {check.name}: {check.detail}")
+        failed = any(not check.ok for check in checks)
+        warned = any(check.severity == "warning" for check in checks)
+        return 1 if failed or (args.strict and warned) else 0
     elif args.root_command == "experiment":
         from .experiments import execute_experiment_command
         return execute_experiment_command(project, args)

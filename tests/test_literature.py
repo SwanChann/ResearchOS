@@ -69,7 +69,7 @@ def test_matrix_rejects_missing_axis_and_appends_verified_paper(rf_env, tmp_path
     project = ResearchProject.open("toy")
     paper_id = verified_paper(project, tmp_path)
     matrix = LiteratureMatrixStore(project)
-    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.initialize("TEST matrix", "TEST verified papers", template="embodied-navigation")
 
     incomplete = complete_entry(paper_id)
     incomplete["cells"].pop("failure_boundary")
@@ -94,7 +94,7 @@ def test_matrix_rejects_broken_claim_and_stale_source(rf_env, tmp_path):
     project = ResearchProject.open("toy")
     paper_id = verified_paper(project, tmp_path)
     matrix = LiteratureMatrixStore(project)
-    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.initialize("TEST matrix", "TEST verified papers", template="embodied-navigation")
 
     broken = complete_entry(paper_id)
     broken["cells"]["main_results"]["evidence"][0]["claim_ids"] = ["C99"]
@@ -115,7 +115,10 @@ def test_matrix_cli_init_add_validate_and_render(rf_env, tmp_path, capsys):
     assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
     project = ResearchProject.open("toy")
     paper_id = verified_paper(project, tmp_path)
-    assert main(["evidence", "matrix", "init", "--title", "TEST matrix", "--scope", "TEST scope"]) == 0
+    assert main([
+        "evidence", "matrix", "init", "--title", "TEST matrix", "--scope", "TEST scope",
+        "--template", "embodied-navigation",
+    ]) == 0
 
     entry_path = tmp_path / "entry.yaml"
     write_yaml(entry_path, complete_entry(paper_id))
@@ -165,7 +168,7 @@ def test_matrix_synthesis_replace_is_validated_atomic_and_idempotent(rf_env, tmp
     first = verified_paper(project, tmp_path, "TEST Paper One")
     second = verified_paper(project, tmp_path, "TEST Paper Two")
     matrix = LiteratureMatrixStore(project)
-    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.initialize("TEST matrix", "TEST verified papers", template="embodied-navigation")
     matrix.add_entry(complete_entry(first))
     matrix.add_entry(complete_entry(second))
 
@@ -191,7 +194,7 @@ def test_matrix_synthesis_upsert_preserves_unmentioned_records(rf_env, tmp_path)
     project = ResearchProject.open("toy")
     paper_id = verified_paper(project, tmp_path)
     matrix = LiteratureMatrixStore(project)
-    matrix.initialize("TEST matrix", "TEST verified papers")
+    matrix.initialize("TEST matrix", "TEST verified papers", template="embodied-navigation")
     matrix.add_entry(complete_entry(paper_id))
     matrix.synthesize(synthesis_update(paper_id))
 

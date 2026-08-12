@@ -27,7 +27,9 @@ The functional core validates records, IDs, transitions, scope, and provenance. 
 <remote workspace>/               persistent remote repos/worktrees/runs
 ```
 
-Project files are authoritative. JSONL registries are append-friendly event/index layers; experiment cards and run records remain authoritative records.
+Project files are authoritative. JSONL registries are append-friendly event/index layers; experiment cards and run records remain authoritative records. `.research/artifacts.yaml` is the atomic Artifact registry, while `KNOWLEDGE.md` contains a delimited generated navigation view plus user-owned prose.
+
+Snapshots are portable ZIP containers with a hashed manifest and safe manual extraction. Creation uses a temporary target followed by atomic replacement. Restore defaults to a new directory; in-place restore creates a recoverable sibling copy before replacement. Repositories, Zotero PDFs, datasets, weights, and other external authorities are referenced in the manifest but excluded by default.
 
 ## Core repository
 
@@ -57,8 +59,10 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 - Ordinary integrity checks are local-only; live machine probes require an explicit flag.
 - Remote jobs use an atomic lock directory on the server and append-only state events; this is cooperative coordination, not an operating-system GPU reservation.
 - Secrets stay in environment variables, SSH configuration, or credential stores.
-- The Zotero adapter accepts loopback `/api` URLs only, implements `GET` only, and never requests or stores a write key.
+- The Zotero adapter accepts loopback `/api` URLs only, implements `GET` only, and never requests or stores a write key. Its doctor classifies configuration, transport, identity, item/library, and local attachment-path failures without downloading attachments.
+- Schema/contract validation, source fingerprinting, human review, reproduction, and scientific establishment are separate layers. Reviews are bound to content fingerprints and become stale after relevant content changes.
+- Matrix axes are embedded and versioned. They lock on first insertion; changes require a mapping file, dry-run, automatic snapshot, preserved superseded cells, and migration provenance.
 
 ## Deliberate omissions
 
-V0.4.2 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it. Zotero performs local full-text retrieval; ResearchFlow keeps paper analyses and the structured cross-paper matrix, with no copied PDFs.
+V0.5.0 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. Snapshots are project-workspace copies, not a scheduler or complete machine backup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it.

@@ -37,7 +37,7 @@
       "type": "object",
       "required": ["id", "title", "trigger", "mechanism", "falsification", "risks", "novelty", "evidence"],
       "properties": {
-        "id": {"type": "string", "pattern": "^XIDEA-[0-9]{3}$"},
+        "id": {"type": "string", "pattern": "^XIDEA-[0-9]{3,4}$"},
         "title": {"type": "string", "minLength": 1},
         "trigger": {"type": "string", "minLength": 1},
         "mechanism": {"type": "string", "minLength": 1},

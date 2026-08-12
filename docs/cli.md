@@ -9,20 +9,28 @@ rf init --home PATH
 rf project add ID --repo PATH [--name NAME]
 rf project list
 rf project show [ID]
-rf status
+rf status [--verbose]
+rf snapshot create|list|show|verify|restore
 rf evidence paper add PDF --title TITLE [metadata]
 rf evidence paper list|show
 rf evidence paper verify PAPER-ID --sha256 HEX --source-version VERSION --pages N
                          --core-operator TEXT --primary-logic TEXT --methods CSV
-rf evidence matrix init --title TITLE --scope SCOPE
+rf evidence paper review PAPER-ID --reviewer NAME --decision accepted|revision_requested|rejected --scope TEXT
+rf evidence matrix templates list|show
+rf evidence matrix axes scaffold|validate|confirm
+rf evidence matrix init --title TITLE --scope SCOPE [--template NAME | --axes-file YAML]
 rf evidence matrix add ENTRY.yaml
 rf evidence matrix synthesize UPDATE.yaml
+rf evidence matrix migrate MIGRATION.yaml [--dry-run]
+rf evidence matrix review --reviewer NAME --decision DECISION --scope TEXT
 rf evidence matrix validate|render|show
 rf evidence repo add --name NAME --commit SHA (--url URL | --local PATH)
 rf evidence repo list|show|search
 rf evidence search QUERY
 rf evidence zotero configure [--base-url LOOPBACK_API] [--library users/0]
-rf evidence zotero status|libraries|collections
+rf evidence zotero status [--verbose]
+rf evidence zotero doctor [--item-key KEY]
+rf evidence zotero libraries|collections
 rf evidence zotero search QUERY [--collection KEY] [--tag TAG] [--limit N]
 rf evidence zotero show ITEM_KEY
 rf evidence zotero bibliography ITEM_KEY... [--style CSL_STYLE] [--locale LOCALE]
@@ -30,18 +38,32 @@ rf evidence zotero link ITEM_KEY
 rf evidence zotero refresh PAPER-ID
 rf memory observation add|show
 rf memory decision add|show
-rf hypothesis new|show
+rf artifact add|list|show|verify|refresh|supersede|migrate
+rf knowledge rebuild [--dry-run]
+rf knowledge check
+rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact
+rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact FILE
+rf migrate paper-verification [--dry-run]
+rf hypothesis new|show [--ideas XIDEA-0001,...]
 rf daily
-rf doctor [--probe-machines]
+rf doctor [--strict] [--probe-machines]
 ```
+
+Snapshot creation defaults to `<research-home>/.snapshots/<project-id>` and accepts `--output-dir`. `verify` checks manifest integrity plus missing, extra, size-changed, and hash-changed members. Restore defaults to a new target, prevents traversal/absolute-path escape, and performs no writes with `--dry-run`. In-place restore requires `--in-place --yes` and preserves a sibling rollback copy. Snapshot manifests identify external authorities but do not claim they were backed up.
+
+`project add/show/status` report the workspace/repo boundary, reachability, Git repository, branch/detached state, HEAD/unborn state, commit/checkpoint, tracked modifications, untracked files, and snapshot availability. `doctor` emits PASS/WARN/FAIL; warnings preserve exit code 0 unless `--strict` is supplied.
 
 `--project ID` is resolved through the global ResearchFlow configuration and is independent of the shell's current directory. `project show ID` prints the resolved workspace, the new-session startup files, and an explicit status command. Prefer explicit project selection whenever more than one topic exists.
 
 Zotero subcommands are read-only toward Zotero. Search/full-text indexing, collections/tags, attachments/annotations, and CSL formatting remain Zotero functions. `link`, `refresh`, and `paper verify` write only ResearchFlow analysis/provenance records and never copy or modify Zotero PDFs. See [Zotero integration](zotero.md).
 
-After primary-source inspection, `paper verify` validates the required page-cited deep-read sections, marks the paper `verified`, records the inspected PDF hash/version/page count, and synchronizes method/status fields into the paper index. Here `verified` means checked against that exact document, not independently reproduced.
+After primary-source inspection, `paper verify` validates the page-cited deep-read contract and records its source fingerprint. It emits explicit contract/source/fingerprint/human-review/reproduction/scientific-claim states. `paper review` records a named, scoped human decision against that fingerprint. Reverification with another fingerprint makes the old review stale.
 
-The literature matrix lives at `.research/literature_matrix.md`. Its YAML frontmatter is authoritative and its Markdown tables are generated. `matrix add` is append-only for paper IDs: the entry must cover every configured comparison axis, supported cells must carry `C##` plus PDF-page evidence, and the referenced paper fingerprint must still match its verified deep read. `matrix synthesize` atomically applies a schema-checked cross-paper synthesis/idea update and rejects broken paper or claim references. `matrix validate` detects missing/unknown axes, duplicates, stale fingerprints, unverified papers, and broken claim references.
+The literature matrix lives at `.research/literature_matrix.md`. New matrices default to the `generic` template; `embodied-navigation` preserves the historical 12 axes. Confirmed project YAML is also accepted. Axes lock after the first paper. `matrix migrate` previews an explicit old→new mapping, snapshots before writes, retains unmapped cells/evidence as superseded provenance, and is idempotent on replay.
+
+Artifact commands operate on `.research/artifacts.yaml`. Registered paths must resolve inside the project workspace. `verify` checks existence, hash, and linked IDs only. `refresh` deliberately accepts a new file hash; `supersede` retains the historical file and bidirectional chain. `artifact migrate --scan PATH --dry-run` lists legacy candidates without changing them; a real migration creates a snapshot and registers them as drafts.
+
+`knowledge rebuild` replaces only the delimited generated region and is idempotent. `knowledge check` reports stale registry coverage, broken links, and superseded-current mistakes. Concise `status` includes registry counts; `status --verbose` exposes individual entries and artifact integrity.
 
 Experiment and run commands:
 
@@ -80,4 +102,4 @@ Remote execution does not upload a repository, datasets, checkpoints, or videos.
 
 Compute commands do not require a default research project. A live `compute probe` returns a non-zero exit code when the target is unreachable; `--dry-run` remains successful without opening a connection.
 
-`rf doctor` performs local integrity checks by default and reports configured machines as skipped. `rf doctor --probe-machines` is an explicit live operation that may execute `nvidia-smi` locally or contact configured SSH hosts. Use it only with current authorization and the required network/VPN state.
+`rf doctor` performs local integrity checks by default and reports configured machines as skipped. `rf doctor --probe-machines` is an explicit live operation that may execute `nvidia-smi` locally or contact configured SSH hosts. Use it only with current authorization and the required network/VPN state. `evidence zotero doctor` is a separate loopback-only diagnostic and performs GET requests only.

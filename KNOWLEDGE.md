@@ -16,3 +16,4 @@ This file indexes ResearchFlow's own design knowledge; it is not a project resea
 - Start-new-topic prompt: `docs/prompts/start-new-topic.md`
 - Portable system-build handoff: `docs/handoffs/researchflow-system-build.md`
 - Architecture decisions: `docs/decisions/`
+- Durability/review/migration decision: `docs/decisions/ADR-0006-snapshots-review-and-explicit-migrations.md`

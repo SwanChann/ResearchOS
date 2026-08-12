@@ -23,7 +23,8 @@ description: Turn one primary paper PDF into a page-cited, claim-strength-calibr
 4. State the scope of every important claim. Paper-source verification proves correspondence to the document, not independent reproduction or universal validity.
 5. Keep critique separate from paper claims. Look for comparator scope, sample size, uncertainty, hidden system dependencies, deployment boundaries, negative results, and failure cases.
 6. Write each idea seed with trigger, proposed mechanism, supporting claim IDs/pages, counterevidence or risk, novelty status, smallest falsification test, and promotion rule. Mark novelty `unchecked` until a separate current literature search.
-7. Remove all unread placeholders, then run `rf evidence paper verify` with the document fingerprint and method labels. Do not mark `verified` if page citations or primary-source inspection are missing.
+7. Work in the PAPER analysis shell created by ResearchFlow or use `rf scaffold paper-analysis`; run `rf preflight paper-analysis PATH` before the formal verification gate. Do not handwrite a second "formal" Markdown record outside the contract.
+8. Remove all unread placeholders, then run `rf evidence paper verify` with the document fingerprint and method labels. If semantic acceptance is required, record it separately with `rf evidence paper review`; never imply that source verification is human review or reproduction.
 
 ## Output contract
 
@@ -33,4 +34,4 @@ The analysis must retain these level-two headings: `Source Snapshot`, `Claim Str
 
 - Zotero remains authoritative for bibliography, PDFs, collections, notes, annotations, and citation formatting. Store only the source reference/fingerprint and ResearchFlow analysis.
 - An idea seed is not a finding or approved experiment. Promote it to `HYP-*` only after the research question and falsification rule are reviewed.
-- Never write a paper-reported result as a project result, and never treat `verified` as `reproduced`.
+- Never write a paper-reported result as a project result. Contract/source/fingerprint validity, human review, reproduction, and scientific establishment are distinct states.

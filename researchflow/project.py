@@ -61,6 +61,7 @@ AGENT_RULES = """# Project Agent Protocol
 At startup:
 
 1. Read this file, `KNOWLEDGE.md`, and `memory/current-state.md`.
+   Run `rf knowledge check`; rebuild only the delimited generated region when stale.
 2. If code work is involved, inspect the configured research repository and its Git status.
 3. Read the relevant `skills/<name>/SKILL.md`, classify the question, and retrieve task-specific evidence; do not load all history.
 4. Separate verified literature/code, observations, experimental results, hypotheses, inference, and needs-verification.
@@ -68,6 +69,8 @@ At startup:
 6. Before a run, validate the experiment card, approval, Git provenance, scope, budget, and stop conditions.
 7. Never run a full GPU job, push, merge, delete data, or operate a real robot without explicit approval.
 8. Write durable findings back as Observation, Hypothesis, Run, or Decision records with provenance.
+9. Use CLI scaffold/preflight and the Artifact registry for formal products. Contract/source/hash checks and human review do not establish reproduction or scientific truth.
+10. Treat workspace snapshots, Git checkpoints, Zotero, and external asset backups as separate recovery boundaries.
 """
 
 CURRENT_STATE = """# Current State
@@ -175,6 +178,12 @@ def add_project(project_id: str, repo: Path, name: str | None = None, config: di
         shutil.copy2(source_skills / skill / "SKILL.md", target / "SKILL.md")
     for path in ("evidence/papers/index.jsonl", "experiments/registry.jsonl", "runs/registry.jsonl"):
         atomic_text(workspace / path, "")
+    project = ResearchProject(workspace, data)
+    from .artifact import ArtifactStore
+    from .knowledge import KnowledgeStore
+    artifacts = ArtifactStore(project)
+    artifacts.initialize()
+    KnowledgeStore(project).rebuild()
     return workspace
 
 
@@ -203,20 +212,43 @@ class ResearchProject:
     def repo(self) -> Path:
         return Path(self.data["repo"]["local"])
 
-    def status(self) -> dict[str, Any]:
+    def status(self, *, verbose: bool = False) -> dict[str, Any]:
         from .io import read_jsonl
+        from .gitops import inspect_git_state
+        from .snapshot import list_snapshots
         state = parse_current_state(self.root / "memory" / "current-state.md")
         experiment_events = read_jsonl(self.root / "experiments" / "registry.jsonl")
         run_events = [item for item in read_jsonl(self.root / "runs" / "registry.jsonl") if item.get("event") == "registered"]
         decisions = sorted((self.root / "memory" / "decisions").glob("DEC-*.md"))
-        return {
+        from .knowledge import KnowledgeStore
+        knowledge = KnowledgeStore(self)
+        result = {
             "id": self.data["id"], "name": self.data["name"], "repo": str(self.repo),
+            "workspace": str(self.root),
+            "authority_boundaries": {
+                "researchflow_workspace": "authoritative research-control records",
+                "independent_repo": "authoritative executable research code and Git history",
+                "global_config": "local machine defaults and aliases; not a project record",
+                "zotero": "authoritative bibliography, PDFs, collections, tags, annotations, and citation formatting",
+            },
+            "repo_state": inspect_git_state(self.repo).as_dict(),
+            "snapshot_state": {
+                "default_directory": str(research_home() / ".snapshots" / self.data["id"]),
+                "count": len([item for item in list_snapshots(self) if item.get("valid")]),
+                "external_assets_included": False,
+            },
             "current_state": state,
             "latest_experiment": experiment_events[-1] if experiment_events else None,
             "last_result": run_events[-1] if run_events else None,
             "latest_decision": decisions[-1].stem if decisions else None,
             "next_action": state.get("Next Action"),
+            "registry_summary": knowledge.summary(),
+            "knowledge_navigation": knowledge.check(),
         }
+        if verbose:
+            result["registry_entries"] = knowledge.inventory()
+            result["artifact_verification"] = __import__("researchflow.artifact", fromlist=["ArtifactStore"]).ArtifactStore(self).verify()
+        return result
 
     @property
     def evidence(self):

@@ -12,6 +12,7 @@ from researchflow.config import configure_zotero
 from researchflow.errors import ResearchFlowError
 from researchflow.project import ResearchProject, add_project
 from researchflow.zotero import ZoteroClient, validate_base_url
+from researchflow.zotero import diagnose_zotero
 
 
 ITEM = {
@@ -39,6 +40,10 @@ def zotero_server():
         def do_GET(self):
             parsed = urlsplit(self.path)
             requests.append(("GET", parsed.path, parse_qs(parsed.query)))
+            if parsed.path in {"/api/groups/999/items", "/api/users/0/items/MISSING1"}:
+                self.send_response(404)
+                self.end_headers()
+                return
             self.send_response(200)
             self.send_header("Zotero-API-Version", "3")
             self.send_header("Zotero-Schema-Version", "42")
@@ -66,6 +71,8 @@ def zotero_server():
                 return [{"key": "COLL1234", "data": {"name": "TEST Collection"}}]
             if path == "/api/users/0/items/top":
                 return [ITEM, {"key": "NOTE1234", "data": {"itemType": "note"}}]
+            if path == "/api/users/0/items":
+                return [ITEM]
             if path == "/api/users/0/items/ABCD1234":
                 return ITEM
             if path == "/api/users/0/items/ABCD1234/children":
@@ -75,6 +82,8 @@ def zotero_server():
                 ]
             if path == "/api/users/0/items/ATTACH01/children":
                 return [{"key": "ANNOT001", "data": {"itemType": "annotation", "annotationText": "TEST quote"}}]
+            if path == "/api/users/0/items/ATTACH01":
+                return {"key": "ATTACH01", "data": {"itemType": "attachment", "filename": "test.pdf"}}
             raise AssertionError(f"Unexpected TEST endpoint: {path}")
 
         def log_message(self, format, *args):
@@ -149,3 +158,51 @@ def test_cli_configure_status_link_and_refresh(rf_env, zotero_server, capsys):
     assert main(["evidence", "zotero", "refresh", "PAPER-0001"]) == 0
     assert "PAPER-0001" in capsys.readouterr().out
     assert "TEST analysis preserved." in analysis.read_text(encoding="utf-8")
+
+
+def test_zotero_doctor_classifies_config_connection_library_and_target(rf_env, zotero_server):
+    base_url, requests = zotero_server
+    bad_url = diagnose_zotero(config={
+        "preferences": {"literature": {"authority": "zotero", "zotero": {"base_url": "https://api.zotero.org", "library": "users/0"}}}
+    })
+    assert bad_url["checks"][0]["category"] == "invalid_base_url"
+    bad_library = diagnose_zotero(config={
+        "preferences": {"literature": {"authority": "zotero", "zotero": {"base_url": base_url, "library": "bad"}}}
+    })
+    assert bad_library["checks"][0]["category"] == "invalid_library"
+
+    unavailable = ZoteroClient("http://127.0.0.1:1/api", timeout=0.2).diagnose()
+    assert unavailable["checks"][0]["category"] == "desktop_not_running_or_port_refused"
+
+    missing_library = ZoteroClient(base_url, "groups/999").diagnose()
+    assert missing_library["checks"][-1]["category"] == "target_or_library_not_found"
+    missing_item = ZoteroClient(base_url).diagnose(item_key="MISSING1")
+    assert any(check["category"] == "target_or_library_not_found" for check in missing_item["checks"])
+    attachment_item = ZoteroClient(base_url).diagnose(item_key="ATTACH01")
+    assert any(check["category"] == "attachment_or_nonbibliographic_item" for check in attachment_item["checks"])
+    assert {method for method, _, _ in requests} == {"GET"}
+
+
+def test_zotero_verbose_diagnoses_server_identity_and_missing_attachment(rf_env, zotero_server, capsys):
+    base_url, requests = zotero_server
+    assert main(["project", "add", "toy", "--repo", str(rf_env["repo"])]) == 0
+    configure_zotero(base_url, "users/0")
+    project = ResearchProject.open("toy")
+    project.evidence.link_zotero(ZoteroClient(base_url), "ABCD1234")
+
+    result = ZoteroClient(base_url).diagnose(project)
+    assert result["status"] == "PASS_WITH_WARNINGS"
+    assert result["attachments"][0]["exists"] is False
+    assert any(check["category"] == "attachment_path_missing" for check in result["checks"])
+
+    index = project.root / "evidence" / "papers" / "index.jsonl"
+    index.write_text(index.read_text(encoding="utf-8").replace("TESTSERVER", "OLD-SERVER"), encoding="utf-8")
+    changed = ZoteroClient(base_url).diagnose(project)
+    assert changed["healthy"] is False
+    assert any(check["category"] == "server_identity_changed" for check in changed["checks"])
+
+    assert main(["evidence", "zotero", "status", "--verbose"]) == 1
+    output = capsys.readouterr().out
+    assert "read_only_get_only" in output
+    assert "No API key, write, PDF download" in output
+    assert {method for method, _, _ in requests} == {"GET"}

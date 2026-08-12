@@ -229,6 +229,14 @@ class EvidenceStore:
         metadata["core_operator"] = core_operator.strip()
         metadata["primary_logic"] = primary_logic.strip()
         metadata["verified_at"] = verified_at
+        from .review import paper_verification
+        computed = paper_verification(metadata)
+        metadata["verification"] = {
+            key: computed[key] for key in (
+                "contract_valid", "source_verified", "fingerprint_verified", "semantic_review_pending",
+                "human_reviewed", "reproduction_unverified", "scientific_claim_unestablished",
+            )
+        }
         validate_record("paper", metadata)
         atomic_text(path, markdown_record(metadata, body))
         self._replace_paper_index(record_id, self._paper_index(metadata, path))
@@ -297,7 +305,8 @@ class EvidenceStore:
             if not path.exists():
                 raise ResearchFlowError(f"Paper evidence not found: {record_id}")
             metadata, body = read_markdown_record(path)
-            return {"metadata": metadata, "body": body}
+            from .review import paper_verification
+            return {"metadata": metadata, "body": body, "verification_status": paper_verification(metadata)}
         if prefix == "REPO":
             path = self.project.root / "evidence" / "repos" / "manifests" / f"{record_id}.yaml"
             return read_yaml(path)

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "artifacts", "updated_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "title", "type", "path", "status", "sha256", "authority",
+          "derived_from", "evidence", "supersedes", "superseded_by", "created_at", "updated_at"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^ARTIFACT-[0-9]{4}$"},
+          "title": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+          "path": {"type": "string", "minLength": 1},
+          "status": {"enum": ["draft", "active", "verified", "superseded"]},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "authority": {"type": "string", "minLength": 1},
+          "derived_from": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"}},
+          "evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"}},
+          "supersedes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^ARTIFACT-[0-9]{4}$"}},
+          "superseded_by": {"type": ["string", "null"], "pattern": "^ARTIFACT-[0-9]{4}$"},
+          "created_at": {"type": "string", "minLength": 1},
+          "updated_at": {"type": "string", "minLength": 1},
+          "schema": {"type": ["string", "null"]},
+          "version": {"type": ["string", "null"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

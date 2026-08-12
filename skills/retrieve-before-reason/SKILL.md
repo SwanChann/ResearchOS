@@ -12,10 +12,10 @@ A research question and the active project workspace.
 ## Protocol
 
 1. Classify the question as project history, literature, novelty/latest, code implementation, or experimental claim.
-2. Read `AGENTS.md`, `KNOWLEDGE.md`, and `memory/current-state.md`; retrieve only task-relevant IDs/files.
+2. Read `AGENTS.md`, `KNOWLEDGE.md`, and `memory/current-state.md`; if the generated Knowledge region is stale, use `rf knowledge check/rebuild` without overwriting manual prose. Retrieve only task-relevant IDs/files.
 3. Project history: follow Decision -> Experiment/Run -> Observation. Literature: local index -> analysis -> original PDF. Code: pinned repository and exact commit. Latest/novelty: local KB plus live search. Experiment: registered run -> raw metrics/config/commits.
 4. Inspect a primary source when the claim depends on exact method, code, metric, or current status.
-5. Label the durable output as Verified Literature, Verified Code, Project Observation, Experimental Result, Hypothesis, Agent Inference, or Needs Verification.
+5. Label the durable output as source/fingerprint-verified literature, human-reviewed interpretation, verified code, Project Observation, Experimental Result, Hypothesis, Agent Inference, or Needs Verification. Never collapse these into a single `verified` scientific claim.
 
 ## Prohibited
 
@@ -23,4 +23,4 @@ Do not treat model memory, a search snippet, an unpinned repository, smoke outpu
 
 ## Output and write-back
 
-Return relevant IDs, verified facts with provenance, inferences, conflicts/gaps, and what could change the answer. Write durable new facts to an evidence or memory record; do not dump the whole answer into `current-state.md`.
+Return relevant IDs, facts with provenance, inferences, conflicts/gaps, review staleness, and what could change the answer. Register durable reports with `rf artifact add` and rebuild the Knowledge generated region; do not dump the whole answer into `current-state.md` or call an ordinary Markdown file a formal record.

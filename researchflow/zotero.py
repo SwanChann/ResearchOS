@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import unquote, urlencode, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 from .config import load_config
@@ -18,6 +20,19 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _LIBRARY_PATTERN = re.compile(r"^(users/0|groups/[0-9]+)$")
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
 _LOOPBACK_OPENER = build_opener(ProxyHandler({}))
+
+SETTINGS_GUIDANCE = {
+    "desktop_path": "Zotero Desktop > Settings > Advanced > Allow other applications on this computer to communicate with Zotero",
+    "official_local_api": "https://www.zotero.org/support/dev/web_api/v3/local_api",
+    "security": "Keep the unauthenticated Local API on loopback; ResearchFlow uses GET only and requests no API key.",
+}
+
+
+class ZoteroDiagnosticError(ResearchFlowError):
+    def __init__(self, category: str, message: str, *, http_status: int | None = None):
+        super().__init__(message)
+        self.category = category
+        self.http_status = http_status
 
 
 def validate_base_url(value: str) -> str:
@@ -102,15 +117,22 @@ class ZoteroClient:
                 return ZoteroResponse(response.read(), response_headers)
         except HTTPError as exc:
             if exc.code == 403:
-                detail = "Enable Zotero Settings > Advanced > Allow other applications on this computer to communicate with Zotero."
+                category = "local_api_unavailable"
+                detail = SETTINGS_GUIDANCE["desktop_path"]
+            elif exc.code == 404:
+                category = "target_or_library_not_found"
+                detail = "The configured library or requested item does not exist in the active Zotero database."
             elif exc.code == 412:
+                category = "server_identity_changed"
                 detail = "The Zotero database identity changed; retry without cached state."
             else:
+                category = "http_error"
                 detail = f"HTTP {exc.code} {exc.reason}"
-            raise ResearchFlowError(f"Zotero Local API request failed: {detail}") from exc
+            raise ZoteroDiagnosticError(category, f"Zotero Local API request failed: {detail}", http_status=exc.code) from exc
         except URLError as exc:
-            raise ResearchFlowError(
-                f"Cannot reach Zotero Local API at {self.base_url}. Start Zotero and enable local API access."
+            raise ZoteroDiagnosticError(
+                "desktop_not_running_or_port_refused",
+                f"Cannot reach Zotero Local API at {self.base_url}. {SETTINGS_GUIDANCE['desktop_path']}",
             ) from exc
         except OSError as exc:
             raise ResearchFlowError(f"Zotero Local API request failed: {exc}") from exc
@@ -207,6 +229,118 @@ class ZoteroClient:
             accept="text/html",
         )
         return response.body.decode("utf-8")
+
+    def diagnose(self, project=None, item_key: str | None = None) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "healthy": False,
+            "access": "read_only_get_only",
+            "base_url": self.base_url,
+            "library": self.library,
+            "settings_guidance": SETTINGS_GUIDANCE,
+            "checks": [],
+            "linked_records": [],
+            "attachments": [],
+        }
+        try:
+            status = self.status()
+            result["checks"].append({"name": "local_api", "status": "PASS", "category": "available", **status})
+            # A root status response does not prove that the configured library exists.
+            self._json(f"{self.library}/items", {"limit": 1})
+            result["checks"].append({"name": "library", "status": "PASS", "category": "library_accessible", "library": self.library})
+            if item_key:
+                try:
+                    item = self.item(item_key)
+                    result["checks"].append({
+                        "name": "target_item", "status": "PASS", "category": "bibliographic_item",
+                        "item_key": item.get("key") or item_key,
+                    })
+                except ResearchFlowError as exc:
+                    category = "attachment_or_nonbibliographic_item" if "not a bibliographic parent item" in str(exc) else getattr(exc, "category", "target_error")
+                    result["checks"].append({"name": "target_item", "status": "FAIL", "category": category, "detail": str(exc)})
+            if project is not None:
+                self._diagnose_linked_records(project, result)
+        except ResearchFlowError as exc:
+            result["checks"].append({
+                "name": "local_api_or_library", "status": "FAIL",
+                "category": getattr(exc, "category", "configuration_or_runtime_error"),
+                "http_status": getattr(exc, "http_status", None), "detail": str(exc),
+            })
+        failures = [check for check in result["checks"] if check["status"] == "FAIL"]
+        warnings = [check for check in result["checks"] if check["status"] == "WARN"]
+        result["healthy"] = not failures
+        result["status"] = "FAIL" if failures else ("PASS_WITH_WARNINGS" if warnings else "PASS")
+        result["boundaries"] = [
+            "No API key, write, PDF download, Collection/Tag/Note/Annotation mutation, or non-loopback request is performed.",
+            "Attachment existence is a local path check; it does not copy or read the PDF.",
+        ]
+        return result
+
+    def _diagnose_linked_records(self, project, result: dict[str, Any]) -> None:
+        for record in project.evidence.list("paper"):
+            source = record.get("zotero") or {}
+            if not source:
+                continue
+            identity_changed = bool(source.get("server_id") and self.server_id and source["server_id"] != self.server_id)
+            linked = {
+                "paper_id": record["id"], "item_key": source.get("item_key"),
+                "recorded_server_id": source.get("server_id"), "current_server_id": self.server_id,
+                "identity_changed": identity_changed,
+            }
+            result["linked_records"].append(linked)
+            if identity_changed:
+                result["checks"].append({
+                    "name": f"linked {record['id']} identity", "status": "FAIL",
+                    "category": "server_identity_changed", "detail": "Recorded Zotero Server ID differs from the active database.",
+                })
+                continue
+            try:
+                context = self.context(str(source["item_key"]))
+            except ResearchFlowError as exc:
+                result["checks"].append({
+                    "name": f"linked {record['id']} item", "status": "FAIL",
+                    "category": getattr(exc, "category", "target_not_found"), "detail": str(exc),
+                })
+                continue
+            for attachment in context["attachments"]:
+                file_url = attachment.get("file_url")
+                attachment_path = _file_url_path(file_url) if file_url else None
+                exists = attachment_path.is_file() if attachment_path else False
+                result["attachments"].append({
+                    "paper_id": record["id"], "attachment_key": attachment.get("key"),
+                    "path": str(attachment_path) if attachment_path else None, "exists": exists,
+                })
+                if not exists:
+                    result["checks"].append({
+                        "name": f"attachment {attachment.get('key')}", "status": "WARN",
+                        "category": "attachment_path_missing", "detail": str(attachment_path) if attachment_path else "No local file URL returned.",
+                    })
+
+
+def _file_url_path(value: str | None) -> Path | None:
+    if not value:
+        return None
+    parts = urlsplit(value)
+    if parts.scheme != "file":
+        return None
+    decoded = unquote(parts.path)
+    if os.name == "nt" and re.match(r"^/[A-Za-z]:/", decoded):
+        decoded = decoded[1:]
+    return Path(decoded)
+
+
+def diagnose_zotero(project=None, *, item_key: str | None = None, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        settings = zotero_settings(config)
+        client = ZoteroClient(settings["base_url"], settings["library"])
+    except ResearchFlowError as exc:
+        message = str(exc)
+        category = "invalid_base_url" if "URL" in message or "loopback" in message else "invalid_library"
+        return {
+            "healthy": False, "status": "FAIL", "access": "read_only_get_only",
+            "checks": [{"name": "configuration", "status": "FAIL", "category": category, "detail": message}],
+            "settings_guidance": SETTINGS_GUIDANCE,
+        }
+    return {"authority": settings["authority"], **client.diagnose(project, item_key)}
 
 
 def item_metadata(item: dict[str, Any]) -> dict[str, Any]:

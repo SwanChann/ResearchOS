@@ -8,6 +8,25 @@ Question -> Evidence -> Observation -> Hypothesis -> Experiment Card
          -> human/policy Decision
 ```
 
+A matrix `XIDEA-*` may also feed a Hypothesis directly. ResearchFlow stores the Idea, its matrix fingerprint, and recursive PAPER/claim references; a literature-only Hypothesis is explicitly marked as lacking local empirical support. Matrix or Idea changes make that provenance stale.
+
+## Contract-first literature and artifact workflow
+
+```text
+link/add Paper -> generated analysis shell -> preflight -> source/fingerprint verify
+               -> optional scoped human review (fingerprint-bound)
+confirmed matrix axes -> first Paper locks version -> entries -> synthesis/Idea
+                     -> optional review -> explicit migration when axes change
+ordinary project file -> Artifact draft registration -> hash/reference verify
+formal registries -> KNOWLEDGE generated region -> check/rebuild
+```
+
+Use CLI scaffolds before formal writes. A scaffold may intentionally fail preflight until claims/evidence are filled; it is an agent-generated draft, never a formal ResearchFlow record merely because it is Markdown or YAML. All formal mutable files are atomically replaced. Migrations support dry-run and create a snapshot before a real rewrite.
+
+## Recovery workflow
+
+Create a snapshot to an independently protected location, verify it, dry-run a restore into a new directory, perform the restore, then inspect the startup files and status. An in-place restore is exceptional and requires confirmation plus a rollback copy. Separately recover the independent repo, Zotero, data, and large assets; the project snapshot only covers the ResearchFlow workspace.
+
 Experiment state transitions are validated; `DRAFT -> FULL_RUN` is rejected.
 
 ```text

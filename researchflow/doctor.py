@@ -12,7 +12,7 @@ from .schema import schema_dir, validate_record
 from .io import read_yaml
 from .records import broken_references
 from .compute import probe_machine
-from .gitops import git
+from .gitops import inspect_git_state
 
 
 @dataclass
@@ -20,6 +20,13 @@ class Check:
     name: str
     ok: bool
     detail: str
+    severity: str = "pass"
+
+    @property
+    def status(self) -> str:
+        if not self.ok:
+            return "FAIL"
+        return "WARN" if self.severity == "warning" else "PASS"
 
 
 REQUIRED_CURRENT_STATE_SECTIONS = {
@@ -56,7 +63,45 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
             checks.append(Check(f"project {candidate}", False, str(exc)))
             continue
         checks.append(Check(f"project {candidate} path", project.root.is_dir(), str(project.root)))
-        checks.append(Check(f"project {candidate} repo", project.repo.is_dir(), str(project.repo)))
+        git_state = inspect_git_state(project.repo)
+        checks.append(Check(f"project {candidate} repo reachable", git_state.reachable, str(project.repo)))
+        if git_state.reachable:
+            checks.append(Check(
+                f"project {candidate} Git repository",
+                True,
+                "yes" if git_state.is_repository else (git_state.error or "no"),
+                "pass" if git_state.is_repository else "warning",
+            ))
+        if git_state.is_repository:
+            head_detail = (
+                f"commit {git_state.head_commit}"
+                if git_state.head_exists
+                else "unborn HEAD; no commit/checkpoint exists"
+            )
+            checks.append(Check(
+                f"project {candidate} Git HEAD/checkpoint",
+                True,
+                head_detail,
+                "pass" if git_state.head_exists else "warning",
+            ))
+            branch_detail = "detached HEAD" if git_state.detached else f"branch {git_state.branch or 'unknown'}"
+            checks.append(Check(
+                f"project {candidate} Git branch",
+                True,
+                branch_detail,
+                "warning" if git_state.detached else "pass",
+            ))
+            dirty_detail = (
+                "clean"
+                if git_state.clean
+                else f"dirty: {git_state.tracked_modifications} tracked modification(s), {git_state.untracked_files} untracked file(s)"
+            )
+            checks.append(Check(
+                f"project {candidate} Git worktree",
+                True,
+                dirty_detail,
+                "pass" if git_state.clean else "warning",
+            ))
         startup_files = [project.root / "AGENTS.md", project.root / "KNOWLEDGE.md", project.root / "memory" / "current-state.md"]
         missing_startup = [str(path) for path in startup_files if not path.is_file()]
         checks.append(Check(
@@ -78,12 +123,22 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
             not missing_skills,
             "valid" if not missing_skills else f"missing: {', '.join(missing_skills)}",
         ))
-        if project.repo.is_dir() and (project.repo / ".git").exists():
-            try:
-                inside = git(project.repo, "rev-parse", "--is-inside-work-tree")
-                checks.append(Check(f"project {candidate} Git", inside == "true", inside))
-            except ResearchFlowError as exc:
-                checks.append(Check(f"project {candidate} Git", False, str(exc)))
+        try:
+            from .snapshot import list_snapshots
+            snapshots = list_snapshots(project)
+            valid_snapshots = [item for item in snapshots if item.get("valid")]
+            invalid_snapshots = [item for item in snapshots if item.get("error") or item.get("valid") is False]
+            checks.append(Check(
+                f"project {candidate} snapshot",
+                not invalid_snapshots,
+                f"{len(valid_snapshots)} snapshot(s) registered in the default snapshot directory"
+                if valid_snapshots and not invalid_snapshots
+                else f"{len(invalid_snapshots)} invalid snapshot(s)" if invalid_snapshots
+                else "none; workspace has no verified recovery copy in the default snapshot directory",
+                "pass" if valid_snapshots else "warning",
+            ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} snapshot", True, str(exc), "warning"))
         canonical = [
             project.root / "memory" / "observations",
             project.root / "memory" / "hypotheses",
@@ -100,6 +155,31 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
             checks.append(Check(f"project {candidate} references", not broken, "; ".join(broken) if broken else "valid"))
         except ResearchFlowError as exc:
             checks.append(Check(f"project {candidate} references", False, str(exc)))
+        try:
+            from .artifact import ArtifactStore
+            artifact_result = ArtifactStore(project).verify()
+            checks.append(Check(
+                f"project {candidate} artifacts",
+                artifact_result["valid"],
+                f"{len(artifact_result['results'])} registered; file integrity and references only"
+                if artifact_result["valid"] else "hash, path, or reference mismatch",
+            ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} artifacts", False, str(exc)))
+        try:
+            from .knowledge import KnowledgeStore
+            navigation = KnowledgeStore(project).check()
+            if navigation["broken_links"]:
+                checks.append(Check(f"project {candidate} knowledge navigation", False, f"broken links: {', '.join(navigation['broken_links'])}"))
+            else:
+                checks.append(Check(
+                    f"project {candidate} knowledge navigation",
+                    True,
+                    "current" if navigation["valid"] else "missing or stale generated region; run rf knowledge rebuild --dry-run",
+                    "pass" if navigation["valid"] else "warning",
+                ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} knowledge navigation", False, str(exc)))
         for card in (project.root / "experiments" / "cards").glob("EXP-*.yaml"):
             try:
                 validate_record("experiment", read_yaml(card))

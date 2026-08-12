@@ -3,6 +3,7 @@
 ```text
 Project
   +-- Evidence (Paper, RepositoryEvidence, web reference)
+  +-- Artifact -- registered project product with file hash and lineage
   +-- Observation -- describes what happened
   |       +-- Hypothesis -- falsifiable explanation, never a fact
   |               +-- Experiment -- approved question, scope, budget, metrics
@@ -21,5 +22,10 @@ Smoke verifies plumbing only. Pilot provides a limited directional signal. Full 
 
 ## Entity identity
 
-Human-facing IDs are monotonic and stable: `PAPER-0001`, `REPO-0001`, `OBS-0001`, `HYP-0001`, `EXP-0001`, `RUN-000001`, and `DEC-0001`. Allocation is atomic within one ResearchFlow home and never renumbers existing records.
+Human-facing IDs are monotonic and stable: `PAPER-0001`, `REPO-0001`, `OBS-0001`, `HYP-0001`, `EXP-0001`, `RUN-000001`, `DEC-0001`, and `ARTIFACT-0001`. Matrix ideas use `XIDEA-*` and may be promoted explicitly into a Hypothesis while preserving their PAPER/claim references. A literature-only Hypothesis is marked `literature-derived`; it does not masquerade as an Observation or local empirical support.
 
+## Verification and review layers
+
+`contract_valid` means required fields and relationships pass machine checks. `source_verified` and `fingerprint_verified` bind an analysis to an identified source. `human_reviewed` means a named reviewer accepted only the recorded scope for the current fingerprint. These states do not imply reproduction, novelty, causal support, or scientific truth; those boundaries remain visible as `reproduction_unverified` and `scientific_claim_unestablished`.
+
+Artifact SHA-256 verification establishes file integrity only. Smoke establishes plumbing only. Agent-generated scaffolds are drafts until they pass preflight and any required human review.

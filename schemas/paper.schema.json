@@ -47,6 +47,38 @@
     "core_operator": {"type": ["string", "null"]},
     "primary_logic": {"type": ["string", "null"]},
     "verified_at": {"type": ["string", "null"]}
+    ,
+    "verification": {
+      "type": "object",
+      "required": ["contract_valid", "source_verified", "fingerprint_verified", "semantic_review_pending", "human_reviewed", "reproduction_unverified", "scientific_claim_unestablished"],
+      "properties": {
+        "contract_valid": {"type": "boolean"},
+        "source_verified": {"type": "boolean"},
+        "fingerprint_verified": {"type": "boolean"},
+        "semantic_review_pending": {"type": "boolean"},
+        "human_reviewed": {"type": "boolean"},
+        "reproduction_unverified": {"type": "boolean"},
+        "scientific_claim_unestablished": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reviewer", "decision", "reviewed_at", "scope", "notes", "notes_path", "reviewed_source_fingerprint"],
+        "properties": {
+          "reviewer": {"type": "string", "minLength": 1},
+          "decision": {"enum": ["accepted", "revision_requested", "rejected"]},
+          "reviewed_at": {"type": "string", "minLength": 1},
+          "scope": {"type": "string", "minLength": 1},
+          "notes": {"type": ["string", "null"]},
+          "notes_path": {"type": ["string", "null"]},
+          "reviewed_source_fingerprint": {"type": "string", "pattern": "^[0-9A-F]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
   },
   "additionalProperties": false
 }

@@ -11,6 +11,7 @@ $ResearchFlowCli = 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe'
 & $ResearchFlowCli project list
 & $ResearchFlowCli project show embodied-nav
 & $ResearchFlowCli --project embodied-nav status
+& $ResearchFlowCli --project embodied-nav status --verbose
 ```
 
 这里的 PowerShell 变量只在当前终端有效，不修改系统 PATH。最稳妥的规则是：凡是读写项目状态的命令都显式写 `--project <专题ID>`。这样即使以后默认项目改变，也不会把记录写入错误专题。
@@ -49,6 +50,8 @@ $ResearchFlowCli = 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe'
 - `KNOWLEDGE.md`：证据、论文、矩阵和记录的索引。
 - `memory/current-state.md`：当前问题、阶段、阻塞项和下一步。
 
+`KNOWLEDGE.md` 的 ResearchFlow 生成区可通过 `knowledge check/rebuild` 校验和重建；边界外人工说明不会被覆盖。如果生成区 stale，应先重建导航再选择记录，但不能把重建本身理解为科学审核。
+
 聊天记录可以帮助定位，但不是当前状态的权威证据。项目文件、实时 CLI/Git 状态和任务相关原始证据共同构成恢复依据。
 
 ## 为另一个专题建立独立文献项目
@@ -69,9 +72,10 @@ $ResearchFlowCli = 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe'
 1. 在 Zotero 中用 Collection/Tag 管理候选论文、PDF、批注和引用。
 2. 用 `rf evidence zotero search/show` 查找条目。
 3. 只把确认进入该专题分析的条目 `link` 为 `PAPER-*`。
-4. 深读后用 `paper verify` 固化文档指纹、页码主张和方法标签。
-5. 用 `matrix add/synthesize/validate` 追加结构化比较、跨论文结论和 Idea。
-6. 把后续实验主张继续连接为 Observation、Hypothesis、Experiment、Run 和 Decision。
+4. 深读后用 `preflight` 和 `paper verify` 固化合同、文档指纹、页码主张和方法标签；需要时另做 fingerprint-bound human review。
+5. 先选择通用/领域模板或确认自定义 axes；用 `matrix add/synthesize/validate` 追加比较和 Idea。第一篇后 axes 锁定，变更必须显式迁移。
+6. 可用 `hypothesis new --ideas XIDEA-*` 保留 Idea→PAPER/claim 来源链；这不等于 Observation 或本地实证支持。
+7. 用 Artifact registry 登记报告/审计/协议，再用 `knowledge rebuild` 更新导航。
 
 同一篇 Zotero 论文可以被不同 ResearchFlow 专题引用；Zotero 仍只有一份主条目和 PDF，各专题保存自己的分析关系。ResearchFlow 不复制 Zotero PDF，也不替代 Zotero 去重、批注或引用排版。
 
@@ -93,10 +97,10 @@ $Project = 'embodied-nav'
 
 ## Ubuntu 主机迁移
 
-迁移时复制普通文件构成的 ResearchFlow home，并重新登记各项目在 Ubuntu 下的代码仓库路径；Zotero 数据库和附件由 Zotero 自己的迁移/同步机制负责。CLI 改为 Linux 虚拟环境入口，例如：
+迁移前先对每个项目执行 snapshot create/verify 和恢复演练。项目快照不包含全局配置、独立 repo、Zotero、数据集或权重；这些必须各自备份。迁移时恢复普通文件构成的 ResearchFlow home，并重新登记各项目在 Ubuntu 下的代码仓库路径；Zotero 数据库和附件由 Zotero 自己的迁移/同步机制负责。CLI 改为 Linux 虚拟环境入口，例如：
 
 ```bash
 /opt/ResearchOS/.venv/bin/rf --project embodied-nav status
 ```
 
-不要把 Windows 的绝对 repo 路径直接当作 Ubuntu 路径使用。迁移后先运行 `project show` 和不带 live probe 的 `doctor`，再逐项确认 Zotero loopback、Git 仓库及经批准的 SSH 机器配置。
+不要把 Windows 的绝对 repo 路径直接当作 Ubuntu 路径使用。迁移后先运行 `project show`、`status --verbose`、`knowledge check` 和不带 live probe 的 `doctor`，再逐项确认 Zotero loopback、Git 仓库及经批准的 SSH 机器配置。真实项目的 schema/axes/Artifact 迁移需要另行明确授权；只读检查或 dry-run 不会代替该授权。

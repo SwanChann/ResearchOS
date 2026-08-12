@@ -22,7 +22,7 @@ python -m venv .venv
 
 Linux/macOS uses `.venv/bin/python` and `.venv/bin/rf`. The project uses a standard `pyproject.toml`; `uv sync` is also compatible when uv is available, but is not required.
 
-The five commands to remember are:
+The core commands to remember are:
 
 ```text
 rf status       current question, HYP/EXP/RUN state, next action
@@ -30,6 +30,9 @@ rf evidence     Zotero-linked paper analysis and pinned-code evidence
 rf experiment   card, worktree, preflight, bounded execution
 rf run          provenance, logs, metrics, artifacts
 rf doctor       local config, schemas, tools, paths, references, IDs
+rf snapshot     verifiable workspace recovery copies
+rf artifact     registered project products and file integrity
+rf knowledge    generated navigation that preserves manual prose
 ```
 
 ## Zotero literature boundary
@@ -45,13 +48,41 @@ rf evidence zotero link ITEMKEY
 # Edit the PAPER-* analysis after reading the primary PDF, then finalize it:
 rf evidence paper verify PAPER-0001 --sha256 HEX --source-version VERSION --pages N --core-operator TEXT --primary-logic TEXT --methods method-a,method-b
 # Build a reproducible cross-paper comparison after individual verification:
-rf evidence matrix init --title "Navigation literature" --scope "Verified primary PDFs"
+rf evidence matrix templates list
+rf evidence matrix init --title "Navigation literature" --scope "Verified primary PDFs" --template embodied-navigation
+rf scaffold matrix-entry PAPER-0001 --output .\PAPER-0001.matrix-entry.yaml
+rf preflight matrix-entry .\PAPER-0001.matrix-entry.yaml
 rf evidence matrix add .\PAPER-0001.matrix-entry.yaml
 rf evidence matrix synthesize .\corpus-synthesis.yaml
 rf evidence matrix validate
 ```
 
-`matrix synthesize` accepts a schema-checked YAML file with `matrix_id`, `mode: replace|upsert`, and evidence-linked `syntheses`/`ideas`. Invalid paper or claim references are rejected before the atomic rewrite; replaying an unchanged update is idempotent. Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
+The default matrix template is cross-domain `generic`; the historical 12-axis contract is named `embodied-navigation`. Project axes must be confirmed before initialization, lock after the first paper, and change only through an explicit previewable migration. `matrix synthesize` accepts a schema-checked YAML file with evidence-linked `syntheses`/`ideas`. Invalid paper or claim references are rejected before the atomic rewrite; replaying an unchanged update is idempotent. Linking creates a `PAPER-*` analysis record but does not copy the PDF. See [Zotero integration](docs/zotero.md) and [ADR-0004](docs/decisions/ADR-0004-zotero-literature-authority.md).
+
+## Durability and authority boundaries
+
+ResearchFlow files, Git history, and a complete backup solve different problems:
+
+- The project workspace is the authority for research-control records.
+- The independent repository is the authority for executable code; a clean Git commit is a code checkpoint, not a backup of the separate workspace.
+- `rf snapshot create` creates a verified copy of one project workspace. Its manifest references, but does not copy, the repo, Zotero PDFs, datasets, weights, or large run assets.
+- A private Git remote may provide an off-machine copy of text history, but GitHub is optional and is not a complete backup.
+- A complete recovery plan separately protects the ResearchFlow home/global configuration, Zotero database and attachments, repositories, and non-Git assets, then proves them with a restore drill.
+
+```powershell
+rf --project my-project snapshot create --output-dir E:\ResearchFlowBackups
+rf --project my-project snapshot verify E:\ResearchFlowBackups\my-project-....rfsnapshot
+rf --project my-project snapshot restore SNAPSHOT --target C:\RestoreDrill\my-project --dry-run
+rf --project my-project snapshot restore SNAPSHOT --target C:\RestoreDrill\my-project
+```
+
+In-place restore requires both `--in-place` and `--yes` and first creates a recoverable sibling backup. Optional config export is explicitly requested with `--include-redacted-config`; secrets are never exported raw.
+
+## Artifacts, review, and navigation
+
+Use `rf artifact add/list/show/verify/refresh/supersede` for reports, audit manifests, annotation protocols, and other project products. Artifact verification checks file existence, SHA-256, and record references only—it is not semantic or scientific verification. `rf knowledge rebuild` refreshes only the delimited generated region of `KNOWLEDGE.md`; manual text outside it remains untouched.
+
+Paper and matrix outputs distinguish contract validity, source/fingerprint verification, human semantic review, reproduction, and scientific conclusion. A current accepted human review is scoped to the reviewed fingerprint; changing a PDF fingerprint or matrix content makes it stale. Even a current human review leaves `reproduction_unverified` and `scientific_claim_unestablished` true.
 
 For a configured SSH target, the bounded remote lifecycle is:
 
@@ -77,6 +108,7 @@ The server must already contain the project repository at `<workspace-root>/repo
   skills/
   memory/{current-state.md,observations/,hypotheses/,decisions/}
   evidence/{papers/,repos/}
+  .research/{literature_matrix.md,artifacts.yaml}
   experiments/{cards/,registry.jsonl,reports/}
   runs/{registry.jsonl,RUN-*/}
   notes/daily/
@@ -104,7 +136,7 @@ rf evidence paper add .\papers\method.pdf --title "Method" --year 2026 --tags na
 rf evidence repo add --name OfficialCode --url https://example.invalid/repo --commit abc123 --papers PAPER-0001
 
 rf memory observation add --title "Delayed right turns" --text "Observed on the registered route review." --evidence RUN-000001
-rf hypothesis new --title "Temporal context" --statement "Bounded context may reduce the delay." --observations OBS-0001 --papers PAPER-0001 --falsification "Pilot fails the turning metric or violates a guardrail."
+rf hypothesis new --title "Temporal context" --statement "Bounded context may reduce the delay." --observations OBS-0001 --papers PAPER-0001 --ideas XIDEA-0001 --falsification "Pilot fails the turning metric or violates a guardrail."
 
 rf experiment new --hypothesis HYP-0001 --title "Bounded temporal context" --question "Does it improve turning without collision regression?" --command "python train.py --config configs/temporal.yaml" --allowed-paths src/navigation,configs/temporal.yaml --frozen-paths evaluation,datasets,src/control --primary turning_success_rate --secondary success_rate,SPL --guardrails '{"collision_rate_max_increase_pp":1,"latency_max_increase_pct":10}' --stop-conditions loss_nan,oom_twice,max_runs
 rf experiment worktree EXP-0001 --dry-run
@@ -167,8 +199,8 @@ python -m pytest tests/test_e2e_toy.py -q
 - A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
 - Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
 - Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow supplies a page-cited deep-read template plus an explicit verification/fingerprint gate, but has no built-in PDF parser, embeddings, or vector database.
-- The cross-paper matrix has a schema, completeness/evidence validator, and deterministic Markdown renderer. Its analytical cells still require human/agent primary-source reading; the CLI does not generate scientific judgments automatically.
+- The cross-paper matrix has versioned templates/custom axes, explicit migration, completeness/evidence validation, and deterministic rendering. Its cells still require primary-source reading; scaffolded text is an agent-generated draft, not a scientific judgment.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
 
-The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, additional deep reads, remote cancellation, and retention automation are optional future workflows and do not block the V0.4.2 system Definition of Done.
+The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, additional deep reads, remote cancellation, and retention automation remain separate workflows and do not block the V0.5.0 system boundary.

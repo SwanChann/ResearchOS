@@ -14,6 +14,7 @@ ID_WIDTHS = {
     "EXP": 4,
     "RUN": 6,
     "DEC": 4,
+    "ARTIFACT": 4,
 }
 
 
@@ -36,4 +37,3 @@ def validate_id(value: str, kind: str | None = None) -> bool:
         return False
     prefix, digits = match.groups()
     return (kind is None or prefix == kind.upper()) and len(digits) == ID_WIDTHS[prefix]
-

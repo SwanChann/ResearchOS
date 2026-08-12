@@ -26,11 +26,15 @@ The integration uses the official Local API at `http://127.0.0.1:23119/api`, API
 ```powershell
 rf evidence zotero configure --library users/0
 rf evidence zotero status
+rf evidence zotero status --verbose
+rf evidence zotero doctor [--item-key ITEMKEY]
 rf evidence zotero libraries
 rf evidence zotero collections
 ```
 
 `configure` records `authority: zotero` and `access: read_only` in the global ResearchFlow preferences. It does not connect to Zotero; `status` is the connectivity check.
+
+`doctor` and verbose status distinguish invalid loopback URL/library syntax, desktop/port unreachability, Local API denial, inaccessible library/target item, attachment-vs-bibliographic-item confusion, database Server ID change, and missing local attachment paths. They use GET only, request no key, and check file existence without opening or downloading the PDF.
 
 ## Zotero-owned retrieval
 
@@ -71,4 +75,7 @@ It does not write `evidence/papers/pdf/PAPER-0001.pdf`. `refresh` updates only t
 - **Cannot reach Local API**: Zotero is stopped or the local API preference is disabled.
 - **403**: enable the Zotero local API preference.
 - **Database identity differs**: Zotero is serving a different database/profile; review the source before relinking.
+- **Target/library not found**: confirm `users/0` or the numeric group ID and that the item belongs to the active database.
+- **Attachment/nonbibliographic item**: pass the parent journal/conference/book item key, not an attachment, note, or annotation key.
+- **Attachment path missing**: repair attachment storage/linking in Zotero; ResearchFlow will not download or rewrite it.
 - **Manual PDF copying is disabled**: add/manage the item in Zotero, then use `link`.

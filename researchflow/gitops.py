@@ -4,6 +4,7 @@ import hashlib
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .errors import ResearchFlowError
 
@@ -27,6 +28,92 @@ def git(repo: Path, *args: str, check: bool = True) -> str:
 def require_git_repo(repo: Path) -> None:
     if not repo.is_dir() or git(repo, "rev-parse", "--is-inside-work-tree", check=False) != "true":
         raise ResearchFlowError(f"Formal experiments require a Git repository: {repo}")
+
+
+@dataclass
+class GitState:
+    path: str
+    reachable: bool
+    is_repository: bool
+    head_exists: bool
+    unborn_head: bool
+    branch: str | None
+    detached: bool
+    head_commit: str | None
+    clean: bool | None
+    tracked_modifications: int
+    untracked_files: int
+    recoverable_checkpoint: bool
+    error: str | None = None
+
+    @property
+    def warning(self) -> bool:
+        return (
+            not self.reachable
+            or not self.is_repository
+            or not self.head_exists
+            or not bool(self.clean)
+            or not self.recoverable_checkpoint
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "reachable": self.reachable,
+            "is_repository": self.is_repository,
+            "head_exists": self.head_exists,
+            "head_state": "unborn" if self.unborn_head else "commit" if self.head_exists else "none",
+            "branch": self.branch,
+            "detached": self.detached,
+            "head_commit": self.head_commit,
+            "clean": self.clean,
+            "tracked_modifications": self.tracked_modifications,
+            "untracked_files": self.untracked_files,
+            "recoverable_checkpoint": self.recoverable_checkpoint,
+            "error": self.error,
+        }
+
+
+def inspect_git_state(repo: Path) -> GitState:
+    """Return repository and checkpoint state without mutating Git or the worktree."""
+    resolved = repo.expanduser().resolve()
+    if not resolved.is_dir():
+        return GitState(str(resolved), False, False, False, False, None, False, None, None, 0, 0, False, "path is not a directory")
+    try:
+        inside = subprocess.run(
+            git_command(resolved, "rev-parse", "--is-inside-work-tree"),
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return GitState(
+            str(resolved), True, False, False, False, None, False, None, None,
+            0, 0, False, f"cannot execute Git: {exc}",
+        )
+    if inside.returncode or inside.stdout.strip() != "true":
+        detail = inside.stderr.strip() or "not a Git worktree"
+        return GitState(str(resolved), True, False, False, False, None, False, None, None, 0, 0, False, detail)
+    head_result = subprocess.run(git_command(resolved, "rev-parse", "--verify", "HEAD"), capture_output=True, text=True)
+    head_exists = head_result.returncode == 0
+    head_commit = head_result.stdout.strip() if head_exists else None
+    branch_result = subprocess.run(git_command(resolved, "symbolic-ref", "--quiet", "--short", "HEAD"), capture_output=True, text=True)
+    branch_name = branch_result.stdout.strip() or None
+    detached = head_exists and branch_name is None
+    status_result = subprocess.run(
+        git_command(resolved, "status", "--porcelain=v1", "--untracked-files=all"),
+        capture_output=True,
+        text=True,
+    )
+    if status_result.returncode:
+        detail = status_result.stderr.strip() or "cannot read Git status"
+        return GitState(str(resolved), True, True, head_exists, not head_exists, branch_name, detached, head_commit, None, 0, 0, head_exists, detail)
+    lines = [line for line in status_result.stdout.splitlines() if line]
+    untracked = sum(1 for line in lines if line.startswith("??"))
+    tracked = sum(1 for line in lines if not line.startswith("??"))
+    return GitState(
+        str(resolved), True, True, head_exists, not head_exists, branch_name, detached,
+        head_commit, not lines, tracked, untracked, head_exists, None,
+    )
 
 
 def head(repo: Path) -> str:

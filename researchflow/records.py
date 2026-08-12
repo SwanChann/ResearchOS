@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import hashlib
+import json
 
 from .config import research_home
 from .errors import ResearchFlowError
@@ -26,11 +28,21 @@ def record_exists(project: ResearchProject, ref: str) -> bool:
         "PAPER": project.root / "evidence" / "papers" / "analysis",
         "REPO": project.root / "evidence" / "repos" / "manifests",
         "RUN": project.root / "runs",
+        "ARTIFACT": project.root / ".research",
     }
     prefix = ref.split("-", 1)[0]
+    if prefix == "XIDEA":
+        matrix_path = project.root / ".research" / "literature_matrix.md"
+        if not matrix_path.exists():
+            return False
+        from .literature import LiteratureMatrixStore
+        return any(item["id"] == ref for item in LiteratureMatrixStore(project).load()["ideas"])
     folder = locations.get(prefix)
     if folder is None:
         return False
+    if prefix == "ARTIFACT":
+        from .artifact import ArtifactStore
+        return any(item["id"] == ref for item in ArtifactStore(project).list())
     matches = list(folder.glob(f"{ref}.*")) if prefix != "RUN" else [folder / ref / "run.yaml"]
     return any(path.exists() for path in matches)
 
@@ -50,7 +62,7 @@ def broken_references(project: ResearchProject) -> list[str]:
                 values = metadata.get("evidence", {}).get("refs", [])
             elif folder == "hypotheses":
                 based = metadata.get("based_on", {})
-                values = based.get("observations", []) + based.get("papers", [])
+                values = based.get("observations", []) + based.get("papers", []) + based.get("ideas", [])
             else:
                 values = metadata.get("based_on", [])
             refs.extend((path.name, value) for value in values)
@@ -79,20 +91,93 @@ def add_observation(project: ResearchProject, title: str, content: str, refs: li
     return record_id
 
 
-def add_hypothesis(project: ResearchProject, title: str, statement: str, observations: list[str] | None = None, papers: list[str] | None = None, falsification: str = "Not yet specified.") -> str:
-    observations, papers = observations or [], papers or []
-    _require_refs(project, observations + papers)
+def add_hypothesis(project: ResearchProject, title: str, statement: str, observations: list[str] | None = None, papers: list[str] | None = None, falsification: str = "Not yet specified.", ideas: list[str] | None = None) -> str:
+    observations, papers, ideas = observations or [], papers or [], ideas or []
+    _require_refs(project, observations + papers + ideas)
+    idea_sources = _idea_sources(project, ideas)
     record_id = allocate_id(research_home(), "HYP")
     now = utc_now()
-    metadata = {"id": record_id, "status": "proposed", "based_on": {"observations": observations, "papers": papers}, "created": now, "updated": now, "title": title}
+    if observations and (papers or ideas):
+        derivation = "mixed"
+    elif observations:
+        derivation = "local-observation-derived"
+    else:
+        derivation = "literature-derived"
+    warnings = []
+    if any(item["novelty"] == "unchecked" for item in idea_sources):
+        warnings.append("Referenced literature idea has novelty: unchecked; novelty search/review is still required.")
+    if ideas and not observations:
+        warnings.append("Literature-derived hypothesis: local empirical support has not been established.")
+    metadata = {
+        "id": record_id, "status": "proposed",
+        "based_on": {"observations": observations, "papers": papers, "ideas": ideas},
+        "provenance": {
+            "derivation": derivation, "local_empirical_support": bool(observations),
+            "idea_sources": idea_sources, "warnings": warnings,
+        },
+        "created": now, "updated": now, "title": title,
+    }
     validate_record("hypothesis", metadata)
-    refs = observations + papers
+    refs = observations + papers + ideas
     body = SECTIONS["hypothesis"].format(content=statement, evidence_text="\n".join(f"- {ref}" for ref in refs) or "No linked evidence yet.", falsification=falsification)
     atomic_text(project.root / "memory" / "hypotheses" / f"{record_id}.md", markdown_record(metadata, body))
     update_current_state(project, "Active Hypothesis", f"{record_id} · proposed")
     update_current_state(project, "Current Stage", "Hypothesis proposed; experiment not yet designed.")
     update_current_state(project, "Next Action", f"Design the smallest falsifiable experiment for {record_id}.")
     return record_id
+
+
+def _idea_fingerprint(idea: dict[str, Any]) -> str:
+    payload = json.dumps(idea, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _idea_sources(project: ResearchProject, ideas: list[str]) -> list[dict[str, Any]]:
+    if not ideas:
+        return []
+    from .literature import LiteratureMatrixStore
+    from .review import matrix_fingerprint
+    matrix = LiteratureMatrixStore(project).load()
+    by_id = {item["id"]: item for item in matrix["ideas"]}
+    sources = []
+    for idea_id in ideas:
+        if idea_id not in by_id:
+            raise ResearchFlowError(f"Idea {idea_id} is not present in the current project's formal literature matrix.")
+        idea = by_id[idea_id]
+        sources.append({
+            "id": idea_id, "matrix_id": matrix["id"], "matrix_fingerprint": matrix_fingerprint(matrix),
+            "idea_fingerprint": _idea_fingerprint(idea), "novelty": idea["novelty"],
+            "evidence": idea["evidence"],
+        })
+    return sources
+
+
+def hypothesis_provenance_status(project: ResearchProject, metadata: dict[str, Any]) -> dict[str, Any]:
+    provenance = metadata.get("provenance")
+    if not provenance:
+        return {"legacy": True, "stale": False, "warnings": ["Legacy hypothesis has no structured XIDEA provenance."]}
+    if not provenance["idea_sources"]:
+        return {"legacy": False, "stale": False, "idea_sources": [], "warnings": provenance["warnings"]}
+    from .literature import LiteratureMatrixStore
+    from .review import matrix_fingerprint
+    matrix = LiteratureMatrixStore(project).load()
+    by_id = {item["id"]: item for item in matrix["ideas"]}
+    current_matrix = matrix_fingerprint(matrix)
+    statuses = []
+    for source in provenance["idea_sources"]:
+        idea = by_id.get(source["id"])
+        missing = idea is None
+        matrix_changed = source["matrix_fingerprint"] != current_matrix
+        idea_changed = not missing and source["idea_fingerprint"] != _idea_fingerprint(idea)
+        statuses.append({
+            "id": source["id"], "missing": missing, "matrix_changed": matrix_changed,
+            "idea_changed": idea_changed, "stale": missing or matrix_changed or idea_changed,
+            "novelty": idea.get("novelty") if idea else source["novelty"],
+        })
+    warnings = list(provenance["warnings"])
+    if any(item["stale"] for item in statuses):
+        warnings.append("Idea or literature-matrix provenance changed; hypothesis requires review.")
+    return {"legacy": False, "stale": any(item["stale"] for item in statuses), "idea_sources": statuses, "warnings": warnings}
 
 
 def add_decision(project: ResearchProject, decision: str, reason: str, refs: list[str]) -> str:

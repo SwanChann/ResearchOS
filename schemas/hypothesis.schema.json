@@ -9,13 +9,40 @@
       "type": "object",
       "properties": {
         "observations": {"type": "array", "items": {"type": "string", "pattern": "^OBS-[0-9]{4}$"}},
-        "papers": {"type": "array", "items": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"}}
+        "papers": {"type": "array", "items": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"}},
+        "ideas": {"type": "array", "items": {"type": "string", "pattern": "^XIDEA-[0-9]{3,4}$"}}
       },
       "additionalProperties": false
     },
     "created": {"type": "string"},
     "updated": {"type": "string"},
-    "title": {"type": "string", "minLength": 1}
+    "title": {"type": "string", "minLength": 1},
+    "provenance": {
+      "type": "object",
+      "required": ["derivation", "local_empirical_support", "idea_sources", "warnings"],
+      "properties": {
+        "derivation": {"enum": ["literature-derived", "local-observation-derived", "mixed"]},
+        "local_empirical_support": {"type": "boolean"},
+        "idea_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "matrix_id", "matrix_fingerprint", "idea_fingerprint", "novelty", "evidence"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^XIDEA-[0-9]{3,4}$"},
+              "matrix_id": {"type": "string", "pattern": "^LITMATRIX-[0-9]{4}$"},
+              "matrix_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "idea_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "novelty": {"enum": ["unchecked", "checked"]},
+              "evidence": {"type": "array", "items": {"type": "object"}}
+            },
+            "additionalProperties": false
+          }
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

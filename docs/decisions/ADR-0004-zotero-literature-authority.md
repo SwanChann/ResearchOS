@@ -23,3 +23,4 @@ The connector implements HTTP `GET` only, accepts loopback `/api` URLs only, req
 - Linking creates a `PAPER-*` analysis shell with a Zotero source reference and no local PDF. Refresh updates the bibliographic snapshot while preserving the analysis body.
 - A different `Zotero-Server-ID` blocks refresh because local item versions and keys belong to a specific Zotero database. Older Zotero versions may not return a server ID; that weaker identity is reported rather than hidden.
 - When the Zotero authority preference is enabled, the legacy manual PDF-copy command is rejected. Existing manually managed `PAPER-*` records remain readable for backward compatibility.
+- `rf evidence zotero doctor` and verbose status remain read-only. They classify Local API/configuration/library/item/database-identity failures and check attachment-path existence without downloading or modifying a PDF.

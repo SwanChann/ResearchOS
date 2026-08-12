@@ -4,7 +4,7 @@ This document freezes the small public surface before implementation.
 
 ## CLI
 
-Top-level commands are limited to `init`, `project`, `status`, `evidence`, `memory`, `hypothesis`, `experiment`, `run`, `compute`, `daily`, and `doctor`. Subcommands name an object and one action; no lifecycle-manager hierarchy is exposed.
+The public surface remains object/action oriented. Durability and registry features add the explicit top-level objects `snapshot`, `artifact`, `knowledge`, `scaffold`, `preflight`, and `migrate`; they do not introduce a daemon, database, or hidden automation.
 
 Core forms:
 
@@ -12,11 +12,17 @@ Core forms:
 rf init [--home PATH]
 rf project add|list|show
 rf status
-rf evidence paper add|list|show|verify
-rf evidence matrix init|add|synthesize|validate|render|show
+rf snapshot create|list|show|verify|restore
+rf evidence paper add|list|show|verify|review
+rf evidence matrix templates|axes|init|add|synthesize|migrate|review|validate|render|show
 rf evidence repo add|list|show|search
 rf evidence search QUERY
-rf evidence zotero configure|status|libraries|collections|search|show|bibliography|link|refresh
+rf evidence zotero configure|status|doctor|libraries|collections|search|show|bibliography|link|refresh
+rf artifact add|list|show|verify|refresh|supersede|migrate
+rf knowledge rebuild|check
+rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact
+rf preflight KIND FILE
+rf migrate paper-verification
 rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
@@ -46,7 +52,7 @@ Only `ResearchProject` is a stable convenience facade in V0.1. Lower-level modul
 
 ## Filesystem contracts
 
-Global configuration contains only the research root, defaults, machine aliases, and preferences. Each project workspace contains `project.yaml`, `AGENTS.md`, `KNOWLEDGE.md`, memory records, evidence indexes, experiment cards/registry/reports, run records/artifacts, and daily notes. The research repo is referenced by path.
+Global configuration contains only the research root, defaults, machine aliases, and preferences. Each project workspace contains authoritative records plus `.research/artifacts.yaml`; the research repo and Zotero remain referenced external authorities. Snapshot manifests name those boundaries without claiming external assets were copied.
 
 ## Record contracts
 
@@ -64,6 +70,8 @@ Each `skills/<name>/SKILL.md` declares purpose, required inputs/retrieval, prohi
 
 Zotero operations stay under `evidence zotero`: Zotero owns retrieval, organization, attachment/annotation context, and citation formatting; ResearchFlow `link` is the single handoff into a `PAPER-*` analysis.
 
-`evidence paper verify` is the explicit completion gate for a primary-source deep read. It checks the Markdown contract and records only the inspected document's fingerprint/version/page basis plus searchable analysis labels; it does not copy or mutate the Zotero-owned PDF.
+`evidence paper verify` is the explicit source/fingerprint gate, while `paper review` is a separate human semantic action scoped to a fingerprint. Neither state is named or reported as reproduction or scientific establishment.
 
 `evidence matrix` manages one project-level `.research/literature_matrix.md`. YAML frontmatter is the authoritative structured record; the Markdown comparison tables are a deterministic view. `add` accepts one YAML paper entry, requires a verified `PAPER-*`, rejects duplicate papers or missing/unknown axes, and validates every supported cell's page and claim references before an atomic rewrite. `synthesize` consumes a separate schema-checked update in `replace` or `upsert` mode, verifies every cross-paper claim reference, writes atomically, and treats an unchanged replay as a no-op.
+
+Matrix axes come from a named template or confirmed project YAML. They lock after first insertion. `migrate` is the only supported semantic axes change and preserves superseded values/evidence. Artifact paths are confined to the project workspace; Knowledge is a generated view, not an alternative authority.

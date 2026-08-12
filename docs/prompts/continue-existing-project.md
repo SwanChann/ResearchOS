@@ -23,16 +23,20 @@ ResearchFlow CLI：F:\codespace\ResearchOS\.venv\Scripts\rf.exe
    & 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe' project show '<PROJECT_ID>'
 2. 按输出路径依次完整读取该项目的 AGENTS.md、KNOWLEDGE.md、memory/current-state.md。
 3. 运行：
-   & 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe' --project '<PROJECT_ID>' status
+   & 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe' --project '<PROJECT_ID>' status --verbose
+   & 'F:\codespace\ResearchOS\.venv\Scripts\rf.exe' --project '<PROJECT_ID>' knowledge check
 4. 如果任务涉及研究代码，先在 project show 给出的 repo 中运行 git rev-parse --show-toplevel、git rev-parse HEAD 和 git status --short；保留所有已有未提交改动。
 5. 只检索本轮任务相关的 ResearchFlow 记录。涉及论文主张时，再核对 Zotero、已验证 PAPER 记录和必要的原始 PDF；不要仅凭聊天摘要下结论。
 6. 如果存在多个 handoff/workstream，只选择与项目 ID 和本轮任务匹配的一条，不要混合其他工作流。
+7. 只读报告 snapshot 数量、Git checkpoint 和外部资产未备份边界。不要因为存在本地 Git 或 snapshot 就声称 repo、Zotero、数据集/权重已有完整备份。
+8. 若发现旧 schema、matrix axes 或未登记历史产物，只运行对应 migration `--dry-run` 并给出文件清单、风险和回退方式；未经本轮明确授权不得迁移真实项目。
 
 第一份回复先给“恢复简报”，包含：
 - 已选择的项目 ID、ResearchFlow workspace 和独立 repo；
 - 已核验的当前问题、阶段、active hypothesis/experiment、latest run/decision、阻塞项和 next action；
 - Git HEAD、分支、clean/dirty 状态（仅在代码任务相关时）；
 - 持久记录与当前事实之间的任何不一致；
+- KNOWLEDGE 生成区是否 current、review/provenance 是否 stale，以及 snapshot/外部备份边界；
 - 一项优先下一步，以及它是否需要我的新授权。
 
 恢复简报完成后，再继续本轮已明确要求且已授权的任务。
