@@ -15,8 +15,24 @@ def git_command(repo: Path, *args: str) -> list[str]:
     return ["git", "-c", f"safe.directory={safe_repo}", "-C", str(repo), *args]
 
 
+def _run_git_text(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run Git with its documented UTF-8 path output decoded explicitly.
+
+    Windows may otherwise use the active ANSI code page for ``text=True``.
+    A repository with ``core.quotepath=false`` can then make the background
+    subprocess decoder fail and leave ``stdout`` as ``None``.
+    """
+    return subprocess.run(
+        git_command(repo, *args),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="surrogateescape",
+    )
+
+
 def git(repo: Path, *args: str, check: bool = True) -> str:
-    result = subprocess.run(git_command(repo, *args), capture_output=True, text=True)
+    result = _run_git_text(repo, *args)
     if check and result.returncode:
         detail = result.stderr.strip() or result.stdout.strip()
         raise ResearchFlowError(f"Git command failed in {repo}: git {' '.join(args)}\n{detail}")
@@ -80,11 +96,7 @@ def inspect_git_state(repo: Path) -> GitState:
     if not resolved.is_dir():
         return GitState(str(resolved), False, False, False, False, None, False, None, None, 0, 0, False, "path is not a directory")
     try:
-        inside = subprocess.run(
-            git_command(resolved, "rev-parse", "--is-inside-work-tree"),
-            capture_output=True,
-            text=True,
-        )
+        inside = _run_git_text(resolved, "rev-parse", "--is-inside-work-tree")
     except OSError as exc:
         return GitState(
             str(resolved), True, False, False, False, None, False, None, None,
@@ -93,17 +105,13 @@ def inspect_git_state(repo: Path) -> GitState:
     if inside.returncode or inside.stdout.strip() != "true":
         detail = inside.stderr.strip() or "not a Git worktree"
         return GitState(str(resolved), True, False, False, False, None, False, None, None, 0, 0, False, detail)
-    head_result = subprocess.run(git_command(resolved, "rev-parse", "--verify", "HEAD"), capture_output=True, text=True)
+    head_result = _run_git_text(resolved, "rev-parse", "--verify", "HEAD")
     head_exists = head_result.returncode == 0
     head_commit = head_result.stdout.strip() if head_exists else None
-    branch_result = subprocess.run(git_command(resolved, "symbolic-ref", "--quiet", "--short", "HEAD"), capture_output=True, text=True)
+    branch_result = _run_git_text(resolved, "symbolic-ref", "--quiet", "--short", "HEAD")
     branch_name = branch_result.stdout.strip() or None
     detached = head_exists and branch_name is None
-    status_result = subprocess.run(
-        git_command(resolved, "status", "--porcelain=v1", "--untracked-files=all"),
-        capture_output=True,
-        text=True,
-    )
+    status_result = _run_git_text(resolved, "status", "--porcelain=v1", "--untracked-files=all")
     if status_result.returncode:
         detail = status_result.stderr.strip() or "cannot read Git status"
         return GitState(str(resolved), True, True, head_exists, not head_exists, branch_name, detached, head_commit, None, 0, 0, head_exists, detail)
@@ -181,7 +189,7 @@ def create_worktree(repo: Path, target: Path, baseline: str, dry_run: bool = Fal
     if dry_run:
         return f"DRY-RUN: {command}"
     target.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(git_command(repo, "worktree", "add", "--detach", str(target), baseline), capture_output=True, text=True)
+    result = _run_git_text(repo, "worktree", "add", "--detach", str(target), baseline)
     if result.returncode:
         raise ResearchFlowError(f"Cannot create experiment worktree {target}: {result.stderr.strip()}")
     return str(target)

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["research_area", "application_context", "included_years", "inclusion_rules", "exclusion_rules"],
+  "properties": {
+    "research_area": {"type": "string", "minLength": 1},
+    "application_context": {"type": "string", "minLength": 1},
+    "included_years": {"type": "array", "items": {"type": "integer", "minimum": 1900, "maximum": 2200}, "uniqueItems": true},
+    "inclusion_rules": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+    "exclusion_rules": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  },
+  "additionalProperties": false
+}

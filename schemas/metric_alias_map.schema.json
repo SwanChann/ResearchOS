@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "version", "aliases"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "version": {"type": "string", "minLength": 1},
+    "aliases": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z][a-zA-Z0-9_.-]*$": {
+          "type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

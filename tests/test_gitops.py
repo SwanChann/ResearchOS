@@ -10,6 +10,7 @@ def test_git_trusts_only_the_selected_repository_for_one_command(tmp_path, monke
 
     def fake_run(command, **kwargs):
         captured["command"] = command
+        captured["kwargs"] = kwargs
         return SimpleNamespace(returncode=0, stdout="true\n", stderr="")
 
     monkeypatch.setattr("researchflow.gitops.subprocess.run", fake_run)
@@ -20,3 +21,5 @@ def test_git_trusts_only_the_selected_repository_for_one_command(tmp_path, monke
         f"safe.directory={repo.resolve().as_posix()}",
     ]
     assert captured["command"][3:] == ["-C", str(repo), "rev-parse", "--is-inside-work-tree"]
+    assert captured["kwargs"]["encoding"] == "utf-8"
+    assert captured["kwargs"]["errors"] == "surrogateescape"

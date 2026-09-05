@@ -29,6 +29,10 @@ def record_exists(project: ResearchProject, ref: str) -> bool:
         "REPO": project.root / "evidence" / "repos" / "manifests",
         "RUN": project.root / "runs",
         "ARTIFACT": project.root / ".research",
+        "PROB": project.root / "memory" / "problems",
+        "GAP": project.root / "memory" / "gaps",
+        "CLAIM": project.root / "memory" / "claims",
+        "CORPUS": project.root / "evidence" / "corpora",
     }
     prefix = ref.split("-", 1)[0]
     if prefix == "XIDEA":
@@ -37,12 +41,18 @@ def record_exists(project: ResearchProject, ref: str) -> bool:
             return False
         from .literature import LiteratureMatrixStore
         return any(item["id"] == ref for item in LiteratureMatrixStore(project).load()["ideas"])
+    if prefix == "CGAPRUN":
+        return (project.root / ".research" / "corpus-gap" / "runs" / ref / "manifest.yaml").is_file()
+    if prefix == "EGAUDIT":
+        return (project.root / ".research" / "evidence-graph" / "audits" / f"{ref}.yaml").is_file()
     folder = locations.get(prefix)
     if folder is None:
         return False
     if prefix == "ARTIFACT":
         from .artifact import ArtifactStore
         return any(item["id"] == ref for item in ArtifactStore(project).list())
+    if prefix == "CORPUS":
+        return (folder / f"{ref}.yaml").is_file()
     matches = list(folder.glob(f"{ref}.*")) if prefix != "RUN" else [folder / ref / "run.yaml"]
     return any(path.exists() for path in matches)
 
@@ -62,7 +72,7 @@ def broken_references(project: ResearchProject) -> list[str]:
                 values = metadata.get("evidence", {}).get("refs", [])
             elif folder == "hypotheses":
                 based = metadata.get("based_on", {})
-                values = based.get("observations", []) + based.get("papers", []) + based.get("ideas", [])
+                values = based.get("observations", []) + based.get("papers", []) + based.get("ideas", []) + based.get("gaps", [])
             else:
                 values = metadata.get("based_on", [])
             refs.extend((path.name, value) for value in values)
@@ -76,6 +86,36 @@ def broken_references(project: ResearchProject) -> list[str]:
         data = __import__("yaml").safe_load(path.read_text(encoding="utf-8")) or {}
         if data.get("experiment"):
             refs.append((path.parent.name, data["experiment"]))
+    for path in (project.root / "memory" / "problems").glob("PROB-*.md"):
+        metadata, _ = read_markdown_record(path)
+        if metadata.get("supersedes"):
+            refs.append((path.name, metadata["supersedes"]))
+    for path in (project.root / "memory" / "claims").glob("CLAIM-*.md"):
+        metadata, _ = read_markdown_record(path)
+        values = [*metadata.get("supporting_findings", []), *metadata.get("counter_findings", [])]
+        values.extend(item.get("run_id") for item in metadata.get("metric_evidence", []))
+        values.extend(item.get("artifact_id") for item in metadata.get("metric_evidence", []))
+        if metadata.get("supersedes"):
+            values.append(metadata["supersedes"])
+        refs.extend((path.name, value) for value in values if value)
+    for path in (project.root / "memory" / "gaps").glob("GAP-*.md"):
+        metadata, _ = read_markdown_record(path)
+        values = [metadata.get("problem_id")]
+        derivation = metadata.get("derivation", {})
+        values.extend([derivation.get("corpus_id"), derivation.get("cgap_run_id")])
+        values.extend(item.get("ref") for item in metadata.get("known_counterevidence", []))
+        if metadata.get("supersedes"):
+            values.append(metadata["supersedes"])
+        refs.extend((path.name, value) for value in values if value)
+    for path in (project.root / "evidence" / "corpora").glob("CORPUS-*.yaml"):
+        metadata = __import__("yaml").safe_load(path.read_text(encoding="utf-8")) or {}
+        values = [item.get("id") for item in metadata.get("papers", [])]
+        if metadata.get("supersedes"):
+            values.append(metadata["supersedes"])
+        refs.extend((path.name, value) for value in values if value)
+    for path in (project.root / "evidence" / "corpus-extractions").glob("CORPUS-*/*.yaml"):
+        metadata = __import__("yaml").safe_load(path.read_text(encoding="utf-8")) or {}
+        refs.extend((path.name, value) for value in (metadata.get("corpus_id"), metadata.get("paper_id")) if value)
     return [f"{source} -> {ref}" for source, ref in refs if not record_exists(project, ref)]
 
 
@@ -91,10 +131,11 @@ def add_observation(project: ResearchProject, title: str, content: str, refs: li
     return record_id
 
 
-def add_hypothesis(project: ResearchProject, title: str, statement: str, observations: list[str] | None = None, papers: list[str] | None = None, falsification: str = "Not yet specified.", ideas: list[str] | None = None) -> str:
-    observations, papers, ideas = observations or [], papers or [], ideas or []
-    _require_refs(project, observations + papers + ideas)
+def add_hypothesis(project: ResearchProject, title: str, statement: str, observations: list[str] | None = None, papers: list[str] | None = None, falsification: str = "Not yet specified.", ideas: list[str] | None = None, gaps: list[str] | None = None) -> str:
+    observations, papers, ideas, gaps = observations or [], papers or [], ideas or [], gaps or []
+    _require_refs(project, observations + papers + ideas + gaps)
     idea_sources = _idea_sources(project, ideas)
+    gap_sources = _gap_sources(project, gaps)
     record_id = allocate_id(research_home(), "HYP")
     now = utc_now()
     if observations and (papers or ideas):
@@ -110,15 +151,15 @@ def add_hypothesis(project: ResearchProject, title: str, statement: str, observa
         warnings.append("Literature-derived hypothesis: local empirical support has not been established.")
     metadata = {
         "id": record_id, "status": "proposed",
-        "based_on": {"observations": observations, "papers": papers, "ideas": ideas},
+        "based_on": {"observations": observations, "papers": papers, "ideas": ideas, "gaps": gaps},
         "provenance": {
             "derivation": derivation, "local_empirical_support": bool(observations),
-            "idea_sources": idea_sources, "warnings": warnings,
+            "idea_sources": idea_sources, "gap_sources": gap_sources, "warnings": warnings,
         },
         "created": now, "updated": now, "title": title,
     }
     validate_record("hypothesis", metadata)
-    refs = observations + papers + ideas
+    refs = observations + papers + ideas + gaps
     body = SECTIONS["hypothesis"].format(content=statement, evidence_text="\n".join(f"- {ref}" for ref in refs) or "No linked evidence yet.", falsification=falsification)
     atomic_text(project.root / "memory" / "hypotheses" / f"{record_id}.md", markdown_record(metadata, body))
     update_current_state(project, "Active Hypothesis", f"{record_id} · proposed")
@@ -152,17 +193,38 @@ def _idea_sources(project: ResearchProject, ideas: list[str]) -> list[dict[str, 
     return sources
 
 
+def _gap_sources(project: ResearchProject, gaps: list[str]) -> list[dict[str, Any]]:
+    if not gaps:
+        return []
+    from .corpus_gap import GapStore
+    store = GapStore(project)
+    sources = []
+    for gap_id in gaps:
+        shown = store.show(gap_id)
+        if not shown["approved"]:
+            raise ResearchFlowError(f"Gap {gap_id} is not currently approved by a human reviewer.")
+        review = shown["record"]["review"]
+        sources.append({
+            "id": gap_id, "gap_fingerprint": shown["fingerprint"],
+            "reviewer": review["reviewer"], "reviewed_at": review["reviewed_at"],
+        })
+    return sources
+
+
 def hypothesis_provenance_status(project: ResearchProject, metadata: dict[str, Any]) -> dict[str, Any]:
     provenance = metadata.get("provenance")
     if not provenance:
         return {"legacy": True, "stale": False, "warnings": ["Legacy hypothesis has no structured XIDEA provenance."]}
-    if not provenance["idea_sources"]:
-        return {"legacy": False, "stale": False, "idea_sources": [], "warnings": provenance["warnings"]}
+    if not provenance["idea_sources"] and not provenance.get("gap_sources", []):
+        return {"legacy": False, "stale": False, "idea_sources": [], "gap_sources": [], "warnings": provenance["warnings"]}
     from .literature import LiteratureMatrixStore
     from .review import matrix_fingerprint
-    matrix = LiteratureMatrixStore(project).load()
-    by_id = {item["id"]: item for item in matrix["ideas"]}
-    current_matrix = matrix_fingerprint(matrix)
+    if provenance["idea_sources"]:
+        matrix = LiteratureMatrixStore(project).load()
+        by_id = {item["id"]: item for item in matrix["ideas"]}
+        current_matrix = matrix_fingerprint(matrix)
+    else:
+        by_id, current_matrix = {}, ""
     statuses = []
     for source in provenance["idea_sources"]:
         idea = by_id.get(source["id"])
@@ -174,10 +236,26 @@ def hypothesis_provenance_status(project: ResearchProject, metadata: dict[str, A
             "idea_changed": idea_changed, "stale": missing or matrix_changed or idea_changed,
             "novelty": idea.get("novelty") if idea else source["novelty"],
         })
+    gap_statuses = []
+    from .corpus_gap import GapStore
+    gaps = GapStore(project)
+    for source in provenance.get("gap_sources", []):
+        try:
+            shown = gaps.show(source["id"])
+            stale = not shown["approved"] or shown["fingerprint"] != source["gap_fingerprint"]
+        except ResearchFlowError:
+            stale = True
+        gap_statuses.append({"id": source["id"], "stale": stale})
     warnings = list(provenance["warnings"])
     if any(item["stale"] for item in statuses):
         warnings.append("Idea or literature-matrix provenance changed; hypothesis requires review.")
-    return {"legacy": False, "stale": any(item["stale"] for item in statuses), "idea_sources": statuses, "warnings": warnings}
+    if any(item["stale"] for item in gap_statuses):
+        warnings.append("Approved Gap provenance changed or is no longer approved; hypothesis requires review.")
+    return {
+        "legacy": False,
+        "stale": any(item["stale"] for item in statuses) or any(item["stale"] for item in gap_statuses),
+        "idea_sources": statuses, "gap_sources": gap_statuses, "warnings": warnings,
+    }
 
 
 def add_decision(project: ResearchProject, decision: str, reason: str, refs: list[str]) -> str:
@@ -193,7 +271,10 @@ def add_decision(project: ResearchProject, decision: str, reason: str, refs: lis
 
 
 def show_record(project: ResearchProject, record_id: str) -> tuple[dict[str, Any], str]:
-    folders = {"OBS": "observations", "HYP": "hypotheses", "DEC": "decisions"}
+    folders = {
+        "OBS": "observations", "HYP": "hypotheses", "DEC": "decisions",
+        "PROB": "problems", "GAP": "gaps", "CLAIM": "claims",
+    }
     prefix = record_id.split("-", 1)[0]
     if prefix not in folders:
         raise ResearchFlowError(f"Unsupported memory record ID: {record_id}")

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "graph_id", "edges", "updated_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "graph_id": {"const": "project-evidence-graph"},
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "relation", "to", "provenance_refs", "status", "source_fingerprints", "created_at", "supersedes"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^EDGE-[0-9a-f]{16}$"},
+          "from": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
+          "relation": {"enum": ["identifies", "motivates", "tested_by", "produces", "supports", "weakens", "contradicts", "supports_gap", "weakens_gap", "substantiates"]},
+          "to": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
+          "provenance_refs": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"}, "uniqueItems": true},
+          "status": {"enum": ["active", "stale", "superseded"]},
+          "source_fingerprints": {
+            "type": "object",
+            "minProperties": 2,
+            "patternProperties": {"^[A-Z]+-[0-9]+$": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+            "additionalProperties": false
+          },
+          "created_at": {"type": "string", "minLength": 1},
+          "supersedes": {"type": ["string", "null"], "pattern": "^EDGE-[0-9a-f]{16}$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

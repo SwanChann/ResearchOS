@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "problem_id", "statement", "mechanism_missing", "remaining_scope", "boundary_conditions", "known_counterevidence", "falsification", "derivation", "scores", "candidate_fingerprint", "review", "reviews", "state", "created_at", "supersedes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^GAP-[0-9]{4}$"},
+    "title": {"type": "string", "minLength": 1},
+    "problem_id": {"type": "string", "pattern": "^PROB-[0-9]{4}$"},
+    "statement": {"type": "string", "minLength": 1},
+    "mechanism_missing": {"type": "string", "minLength": 1},
+    "remaining_scope": {"type": "string", "minLength": 1},
+    "boundary_conditions": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+    "known_counterevidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "effect", "rationale"],
+        "properties": {
+          "ref": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+          "effect": {"enum": ["partially_addresses", "fully_addresses", "contradicts"]},
+          "rationale": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "falsification": {"type": "string", "minLength": 1},
+    "derivation": {
+      "type": "object",
+      "required": ["corpus_id", "corpus_fingerprint", "cgap_run_id", "motif_id", "motif_version", "tuple_ids"],
+      "properties": {
+        "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+        "corpus_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "cgap_run_id": {"type": "string", "pattern": "^CGAPRUN-[0-9]{6}$"},
+        "motif_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "motif_version": {"type": "string", "minLength": 1},
+        "tuple_ids": {"type": "array", "items": {"type": "string", "pattern": "^TUPLE-[0-9a-f]{12}$"}, "minItems": 1, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "scores": {
+      "type": "object",
+      "required": ["novelty", "feasibility"],
+      "properties": {
+        "novelty": {"$ref": "motif_rules.schema.json#/$defs/score"},
+        "feasibility": {"$ref": "motif_rules.schema.json#/$defs/score"}
+      },
+      "additionalProperties": false
+    },
+    "candidate_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+      "properties": {
+        "status": {"enum": ["pending", "approved", "rejected", "stale"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_fingerprint": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "rationale": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+        "properties": {
+          "status": {"enum": ["approved", "rejected"]},
+          "reviewer": {"type": "string", "pattern": "^human:.+"},
+          "reviewed_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "rationale": {"type": "string", "minLength": 1},
+          "reviewed_at": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "state": {"enum": ["candidate", "approved", "rejected", "superseded"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "supersedes": {"type": ["string", "null"], "pattern": "^GAP-[0-9]{4}$"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "corpus_id", "paper_id", "paper_fingerprint", "extractor", "tuples", "extraction_fingerprint", "created_at", "review", "reviews"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+    "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+    "paper_fingerprint": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+    "extractor": {
+      "type": "object",
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": {"enum": ["agent", "human", "tool"]},
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "tuples": {"type": "array", "items": {"$ref": "corpus_extraction_request.schema.json#/$defs/tuple"}, "minItems": 1},
+    "extraction_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "minLength": 1},
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+      "properties": {
+        "status": {"enum": ["pending", "accepted", "revision_requested", "rejected", "stale"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_fingerprint": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "rationale": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+        "properties": {
+          "status": {"enum": ["accepted", "revision_requested", "rejected"]},
+          "reviewer": {"type": "string", "minLength": 1},
+          "reviewed_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "rationale": {"type": "string", "minLength": 1},
+          "reviewed_at": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

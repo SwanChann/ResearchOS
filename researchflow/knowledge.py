@@ -59,6 +59,34 @@ class KnowledgeStore:
                     entries.append(self._entry(metadata.get("id", path.stem), metadata.get("title") or metadata.get("decision") or path.stem, kind, path, [str(status)]))
                 except (ResearchFlowError, OSError) as exc:
                     entries.append(self._entry(path.stem, path.stem, kind, path, ["broken"], str(exc)))
+        for folder, kind in (("problems", "Problem"), ("gaps", "Gap"), ("claims", "Claim")):
+            for path in sorted((self.project.root / "memory" / folder).glob("*.md")):
+                try:
+                    metadata, _ = read_markdown_record(path)
+                    labels = [str(metadata.get("status", metadata.get("state", "draft")))]
+                    if kind == "Gap":
+                        from .corpus_gap import GapStore
+                        shown = GapStore(self.project).show(metadata["id"])
+                        labels.append("human-approved" if shown["approved"] else "human-review-pending")
+                    if kind == "Claim":
+                        from .evidence_graph import EvidenceGraphStore
+                        graph = EvidenceGraphStore(self.project).claim_view(metadata["id"])
+                        labels.append("evidence-ready" if graph["evidence_ready"] else "evidence-pending")
+                        labels.append("scientific-claim-unestablished")
+                    entries.append(self._entry(
+                        metadata.get("id", path.stem), metadata.get("title", path.stem), kind, path, labels
+                    ))
+                except (ResearchFlowError, OSError) as exc:
+                    entries.append(self._entry(path.stem, path.stem, kind, path, ["broken"], str(exc)))
+        for path in sorted((self.project.root / "evidence" / "corpora").glob("CORPUS-*.yaml")):
+            try:
+                from .corpus_gap import CorpusStore
+                record = read_yaml(path)
+                verification = CorpusStore(self.project).verify(record["id"])
+                labels = ["frozen", "source-current" if verification["valid"] else "stale"]
+                entries.append(self._entry(record["id"], record["title"], "Corpus", path, labels))
+            except (ResearchFlowError, OSError) as exc:
+                entries.append(self._entry(path.stem, path.stem, "Corpus", path, ["broken"], str(exc)))
         for path in sorted((self.project.root / "experiments" / "cards").glob("EXP-*.yaml")):
             try:
                 data = read_yaml(path)
@@ -110,7 +138,10 @@ class KnowledgeStore:
     def generated_block(self) -> str:
         entries = self.inventory()
         lines = [BEGIN, "", "## ResearchFlow Generated Index", "", "> Machine-generated navigation. File integrity, contract checks, and review state do not establish scientific claims."]
-        order = ("Paper", "Observation", "Hypothesis", "Experiment", "Run", "Decision", "Matrix", "Artifact")
+        order = (
+            "Paper", "Corpus", "Problem", "Gap", "Observation", "Hypothesis", "Experiment",
+            "Run", "Claim", "Decision", "Matrix", "Artifact",
+        )
         for kind in order:
             selected = [item for item in entries if item["kind"] == kind]
             lines.extend(["", f"### {kind}s", ""])
@@ -149,7 +180,10 @@ class KnowledgeStore:
         actual = match.group(0) if match else None
         stale = actual != expected
         expected_ids = {item["id"] for item in self.inventory()}
-        listed_ids = set(re.findall(r"\[(?:((?:PAPER|OBS|HYP|EXP|RUN|DEC|LITMATRIX|ARTIFACT)-\d+))\]", actual or ""))
+        listed_ids = set(re.findall(
+            r"\[(?:((?:PAPER|CORPUS|PROB|GAP|OBS|HYP|EXP|RUN|CLAIM|DEC|LITMATRIX|ARTIFACT)-\d+))\]",
+            actual or "",
+        ))
         broken_links = []
         if actual:
             for relative in re.findall(r"\]\(([^)]+)\)", actual):

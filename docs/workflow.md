@@ -4,7 +4,7 @@
 
 ```text
 Question -> Evidence -> Observation -> Hypothesis -> Experiment Card
-         -> approval/scope preflight -> Run -> raw results -> Observation
+         -> approval/scope preflight -> Run -> raw results -> Observation -> Claim
          -> human/policy Decision
 ```
 
@@ -22,6 +22,18 @@ formal registries -> KNOWLEDGE generated region -> check/rebuild
 ```
 
 Use CLI scaffolds before formal writes. A scaffold may intentionally fail preflight until claims/evidence are filled; it is an agent-generated draft, never a formal ResearchFlow record merely because it is Markdown or YAML. All formal mutable files are atomically replaced. Migrations support dry-run and create a snapshot before a real rewrite.
+
+RFC-0001 adds two gated paths:
+
+```text
+Problem record
+verified Matrix -> frozen Corpus -> locator-bound extraction -> human acceptance
+                -> deterministic candidate Gap -> human approval -> Hypothesis
+HYP -[tested_by]-> EXP -[produces]-> experimental_result OBS -[supports]-> CLAIM
+                               exact RUN + Artifact hash + JSON Pointer value
+```
+
+The graph index is rebuilt from authoritative records and `edges.yaml`. A complete L1 path still leaves semantic review pending. L2/L3 enters through an explicit fingerprint-bound review file. Corpus extraction and Gap promotion each have independent human gates; no motif or model output becomes a Hypothesis automatically.
 
 ## Recovery workflow
 

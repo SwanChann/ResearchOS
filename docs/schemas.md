@@ -10,8 +10,20 @@ Machine-readable JSON Schemas live in `schemas/` and are packaged as installatio
 - `observation`, `hypothesis`, `decision`: epistemically distinct Markdown records with YAML frontmatter. Hypothesis remains backward compatible while optionally storing `XIDEA-*` provenance, recursive PAPER/claim refs, novelty warnings, and staleness fingerprints.
 - `experiment`: lifecycle, scope, metrics, budgets, approvals, and execution command.
 - `run`: one execution and its Git/config/environment/hardware/artifact provenance.
+- `problem` / `problem_request`: stable research scope and the Agent-editable import request. A Problem is not evidence that a Gap exists.
+- `claim` / `claim_request`: a bounded draft Claim with datasets, platforms, seeds, conditions, qualifiers, experimental-result Findings, and exact Run/Artifact/JSON-Pointer metric evidence.
+- `evidence_graph`: typed, fingerprint-bound relation ledger. Only this ledger is authoritative; the JSON index is derived.
+- `evidence_graph_audit`: immutable L1 result plus explicit pending/pass/fail/unavailable/stale L2 and fidelity states. Only `pass` counts as pass.
+- `corpus_scope` / `corpus`: a declared review scope plus frozen matrix and verified-paper source fingerprints.
+- `corpus_extraction_request` / `corpus_extraction`: locator-bound normalized tuples, immutable content fingerprint, and append-only human review history.
+- `motif_rules` / `gap` / `corpus_gap_run`: deterministic candidate derivation, explicitly heuristic scores, human approval, counterevidence, and TEST/MOCK isolation.
+- `evidence_graph_review_request`: provider-neutral, input-fingerprint-bound L2/L3 import.
+- `evidence_graph_migration`: reviewed exact-reference migration, verified snapshot path, and rollback command.
+- `metric_alias_map`: versioned exact alias mapping for metric paths; fuzzy matching remains forbidden.
 
 References are checked before memory records are created. A broken reference is rejected with the missing ID and project rather than persisted as a dangling scientific claim.
+
+`CLAIM-*` never accepts an unscoped `true` or `verified` state. Initial import is `draft`, semantic review starts `pending`, reproduction starts `not_checked`, and `scientific_establishment` remains `not_established`. Metric checks use exact canonical IDs and JSON Pointers; fuzzy key matching is not part of the contract.
 
 Unknown fields are rejected by formal schemas rather than silently discarded. Axes and paper verification upgrades are explicit migrations with `--dry-run`; non-dry-run migration creates a workspace snapshot and is idempotent on replay.
 

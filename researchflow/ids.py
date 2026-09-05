@@ -15,6 +15,12 @@ ID_WIDTHS = {
     "RUN": 6,
     "DEC": 4,
     "ARTIFACT": 4,
+    "CORPUS": 4,
+    "PROB": 4,
+    "GAP": 4,
+    "CLAIM": 4,
+    "CGAPRUN": 6,
+    "EGAUDIT": 6,
 }
 
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "scope", "source_matrix", "papers", "created_at", "created_by", "corpus_fingerprint", "supersedes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+    "title": {"type": "string", "minLength": 1},
+    "scope": {"$ref": "corpus_scope.schema.json"},
+    "source_matrix": {
+      "type": "object",
+      "required": ["id", "sha256"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^LITMATRIX-[0-9]{4}$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "papers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "source_fingerprint", "review_status"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+          "source_fingerprint": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+          "review_status": {"enum": ["verified", "human_reviewed"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "created_at": {"type": "string", "minLength": 1},
+    "created_by": {"type": "string", "minLength": 1},
+    "corpus_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "supersedes": {"type": ["string", "null"], "pattern": "^CORPUS-[0-9]{4}$"}
+  },
+  "additionalProperties": false
+}

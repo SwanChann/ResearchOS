@@ -75,6 +75,78 @@ def artifact_scaffold(output: Path, artifact_path: Path, title: str, artifact_ty
     return target
 
 
+def problem_scaffold(output: Path) -> Path:
+    target = _new_target(output)
+    write_yaml(target, {
+        "title": "DRAFT research problem",
+        "objective": "DRAFT: state the observable objective.",
+        "scope": "DRAFT: state the included and excluded setting.",
+        "constraints": ["DRAFT: state a real resource or deployment constraint."],
+        "application_context": "DRAFT application context",
+        "status": "active",
+        "supersedes": None,
+        "body": "Agent-generated draft; human review is required before import.",
+    })
+    return target
+
+
+def claim_scaffold(output: Path) -> Path:
+    target = _new_target(output)
+    write_yaml(target, {
+        "title": "DRAFT bounded claim",
+        "statement": "DRAFT: state only what the registered Finding supports.",
+        "scope": {
+            "datasets": ["DRAFT-dataset"],
+            "platforms": ["DRAFT-platform"],
+            "seeds": [0],
+            "conditions": ["DRAFT-condition"],
+        },
+        "qualifiers": ["Agent-generated draft; semantic review is required."],
+        "supporting_findings": ["OBS-0000"],
+        "counter_findings": [],
+        "metric_evidence": [{
+            "run_id": "RUN-000000",
+            "artifact_id": "ARTIFACT-0000",
+            "artifact_sha256": "0" * 64,
+            "json_pointer": "/metrics/replace_me",
+            "metric_id": "replace_me",
+            "value": 0,
+            "unit": "replace_me",
+        }],
+        "status": "draft",
+        "supersedes": None,
+        "body": "Agent-generated draft; structural checks do not establish scientific truth.",
+    })
+    return target
+
+
+def graph_review_scaffold(project, claim_id: str, output: Path) -> Path:
+    target = _new_target(output)
+    from .evidence_graph import EvidenceGraphStore
+    graph = EvidenceGraphStore(project)
+    view = graph.claim_view(claim_id)
+    write_yaml(target, {
+        "target": claim_id,
+        "target_fingerprint": view["claim_fingerprint"],
+        "reviewer": "DRAFT-reviewer",
+        "semantic_review": {
+            "status": "unavailable",
+            "rationale": "DRAFT: inspect the Claim, Findings, and falsification boundary.",
+            "experiment_falsifiable": "unavailable",
+            "claim_within_findings": "unavailable",
+        },
+        "fidelity_review": {
+            "status": "pending", "failures": [],
+            "rationale": "DRAFT: record M1-M5 fidelity status or leave explicitly pending.",
+        },
+        "provenance": {
+            "provider": "manual", "model": "none", "prompt_version": "graph-review-v1",
+            "input_fingerprint": graph.review_input_fingerprint(claim_id),
+        },
+    })
+    return target
+
+
 def preflight(project, kind: str, path: Path) -> dict[str, Any]:
     source = path.expanduser().resolve()
     if kind == "paper-analysis":
@@ -91,4 +163,23 @@ def preflight(project, kind: str, path: Path) -> dict[str, Any]:
         return LiteratureMatrixStore(project).preflight_synthesis_file(source)
     if kind == "artifact":
         return __import__("researchflow.artifact", fromlist=["ArtifactStore"]).ArtifactStore(project).preflight_request(source)
+    if kind == "problem":
+        return __import__("researchflow.evidence_graph", fromlist=["ProblemStore"]).ProblemStore(project).preflight(source)
+    if kind == "claim":
+        return __import__("researchflow.evidence_graph", fromlist=["ClaimStore"]).ClaimStore(project).preflight(source)
+    if kind == "corpus-extraction":
+        return __import__("researchflow.corpus_gap", fromlist=["CorpusStore"]).CorpusStore(project).preflight_extraction(source)
+    if kind == "graph-review":
+        from .evidence_graph import EvidenceGraphStore
+        request = __import__("researchflow.io", fromlist=["read_yaml"]).read_yaml(source)
+        validate_record("evidence_graph_review_request", request)
+        graph = EvidenceGraphStore(project)
+        if request["target_fingerprint"] != graph.claim_view(request["target"])["claim_fingerprint"]:
+            raise ResearchFlowError("Graph review target fingerprint is stale.")
+        if request["provenance"]["input_fingerprint"] != graph.review_input_fingerprint(request["target"]):
+            raise ResearchFlowError("Graph review input fingerprint is stale.")
+        return {
+            "valid": True, "kind": kind, "target": request["target"],
+            "meaning": "The review envelope is current; import still reruns L1 and fails closed.",
+        }
     raise ResearchFlowError(f"Unknown scaffold preflight kind: {kind}")

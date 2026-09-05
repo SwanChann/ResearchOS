@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["type", "key"],
+      "properties": {
+        "type": {"enum": ["Paper", "Method", "Task", "Dataset", "Metric", "Assumption", "Result", "Limitation", "FailureCondition"]},
+        "key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$"}
+      },
+      "additionalProperties": false
+    },
+    "locator": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {"enum": ["page", "section", "figure", "table", "paragraph", "path"]},
+        "value": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "tuple": {
+      "type": "object",
+      "required": ["subject", "relation", "object", "evidence", "epistemic_status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^TUPLE-[0-9a-f]{12}$"},
+        "subject": {"$ref": "#/$defs/node"},
+        "relation": {"enum": ["proposes", "evaluated_on", "uses_dataset", "measured_by", "improves_over", "fails_under", "assumes", "limited_by", "contradicts"]},
+        "object": {"$ref": "#/$defs/node"},
+        "evidence": {
+          "type": "object",
+          "required": ["paper_claim_ids", "locators", "exact_text_sha256"],
+          "properties": {
+            "paper_claim_ids": {"type": "array", "items": {"type": "string", "pattern": "^C[0-9]{2}$"}, "minItems": 1, "uniqueItems": true},
+            "locators": {"type": "array", "items": {"$ref": "#/$defs/locator"}, "minItems": 1},
+            "exact_text_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+          },
+          "additionalProperties": false
+        },
+        "epistemic_status": {"const": "paper_reported"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["corpus_id", "paper_id", "paper_fingerprint", "extractor", "tuples"],
+  "properties": {
+    "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+    "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+    "paper_fingerprint": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+    "extractor": {
+      "type": "object",
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": {"enum": ["agent", "human", "tool"]},
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "tuples": {"type": "array", "items": {"$ref": "#/$defs/tuple"}, "minItems": 1}
+  },
+  "additionalProperties": false
+}

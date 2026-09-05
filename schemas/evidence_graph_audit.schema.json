@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "target", "target_fingerprint", "mode", "deterministic_checks", "semantic_review", "fidelity_review", "review_provenance", "earliest_weak_node", "repair_plan", "overall_status", "created_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^EGAUDIT-[0-9]{6}$"},
+    "target": {"type": "string", "pattern": "^CLAIM-[0-9]{4}$"},
+    "target_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mode": {"const": "full_chain"},
+    "deterministic_checks": {
+      "type": "object",
+      "required": ["status", "checks", "issues"],
+      "properties": {
+        "status": {"enum": ["pass", "fail"]},
+        "checks": {"type": "array", "items": {"type": "string"}},
+        "issues": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "semantic_review": {
+      "type": "object",
+      "required": ["status", "reviewer", "rationale"],
+      "properties": {
+        "status": {"enum": ["pending", "pass", "fail", "unavailable", "stale"]},
+        "reviewer": {"type": ["string", "null"]},
+        "rationale": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "fidelity_review": {
+      "type": "object",
+      "required": ["status", "failures", "rationale"],
+      "properties": {
+        "status": {"enum": ["pending", "pass", "fail", "unavailable", "stale"]},
+        "failures": {"type": "array", "items": {"enum": ["M1", "M2", "M3", "M4", "M5"]}, "uniqueItems": true},
+        "rationale": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "review_provenance": {
+      "type": ["object", "null"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["provider", "model", "prompt_version", "input_fingerprint"],
+      "additionalProperties": false
+    },
+    "earliest_weak_node": {"type": ["string", "null"], "pattern": "^[A-Z]+-[0-9]+$"},
+    "repair_plan": {
+      "type": "object",
+      "required": ["allowed_actions", "automatic_mutation"],
+      "properties": {
+        "allowed_actions": {"type": "array", "items": {"enum": ["revise_protocol", "rerun_experiment", "narrow_claim", "add_missing_edge", "review_semantics"]}, "uniqueItems": true},
+        "automatic_mutation": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "overall_status": {"enum": ["pending", "pass", "fail", "unavailable", "stale"]},
+    "created_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

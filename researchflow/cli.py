@@ -211,6 +211,91 @@ def parser() -> argparse.ArgumentParser:
     matrix_review.add_argument("--scope", required=True)
     matrix_review.add_argument("--notes")
     matrix_review.add_argument("--notes-path", type=Path)
+    for kind in ("problem", "claim"):
+        group = evidence_actions.add_parser(kind, help=f"manage formal {kind} records")
+        actions = group.add_subparsers(dest="action", required=True)
+        add_record = actions.add_parser("add")
+        add_record.add_argument("request", type=Path)
+        add_record.add_argument("--dry-run", action="store_true")
+        actions.add_parser("list")
+        show_record_parser = actions.add_parser("show")
+        show_record_parser.add_argument("id")
+        if kind == "claim":
+            supersede_record = actions.add_parser("supersede")
+            supersede_record.add_argument("id")
+            supersede_record.add_argument("--with", required=True, dest="replacement", type=Path)
+            supersede_record.add_argument("--dry-run", action="store_true")
+    corpus = evidence_actions.add_parser("corpus", help="freeze and review a verified paper corpus")
+    corpus_actions = corpus.add_subparsers(dest="action", required=True)
+    corpus_create = corpus_actions.add_parser("create")
+    corpus_create.add_argument("--matrix", required=True)
+    corpus_create.add_argument("--title", required=True)
+    corpus_create.add_argument("--scope-file", required=True, type=Path)
+    corpus_create.add_argument("--created-by", default="agent")
+    corpus_create.add_argument("--supersedes")
+    corpus_create.add_argument("--dry-run", action="store_true")
+    corpus_actions.add_parser("list")
+    corpus_show = corpus_actions.add_parser("show")
+    corpus_show.add_argument("id")
+    corpus_verify = corpus_actions.add_parser("verify")
+    corpus_verify.add_argument("id")
+    corpus_status = corpus_actions.add_parser("status")
+    corpus_status.add_argument("id")
+    corpus_extract = corpus_actions.add_parser("add-extraction")
+    corpus_extract.add_argument("request", type=Path)
+    corpus_extract.add_argument("--dry-run", action="store_true")
+    corpus_review = corpus_actions.add_parser("review-extraction")
+    corpus_review.add_argument("--corpus", required=True)
+    corpus_review.add_argument("--paper", required=True)
+    corpus_review.add_argument("--decision", choices=("accepted", "revision_requested", "rejected"), required=True)
+    corpus_review.add_argument("--reviewer", required=True)
+    corpus_review.add_argument("--rationale-file", required=True, type=Path)
+    corpus_review.add_argument("--dry-run", action="store_true")
+    gap = evidence_actions.add_parser("gap", help="derive and human-review deterministic Gap candidates")
+    gap_actions = gap.add_subparsers(dest="action", required=True)
+    gap_detect = gap_actions.add_parser("detect")
+    gap_detect.add_argument("--corpus", required=True)
+    gap_detect.add_argument("--motifs", required=True, type=Path)
+    gap_detect.add_argument("--test-only", action="store_true")
+    gap_detect.add_argument("--dry-run", action="store_true")
+    gap_list = gap_actions.add_parser("list")
+    gap_list.add_argument("--state", choices=("candidate", "approved", "rejected", "superseded"))
+    gap_show = gap_actions.add_parser("show")
+    gap_show.add_argument("id")
+    gap_review = gap_actions.add_parser("review")
+    gap_review.add_argument("id")
+    gap_review.add_argument("--decision", choices=("approve", "reject"), required=True)
+    gap_review.add_argument("--reviewer", required=True)
+    gap_review.add_argument("--rationale-file", required=True, type=Path)
+    gap_review.add_argument("--dry-run", action="store_true")
+    graph = evidence_actions.add_parser("graph", help="manage the rebuildable project EvidenceGraph")
+    graph_actions = graph.add_subparsers(dest="action", required=True)
+    graph_connect = graph_actions.add_parser("connect", help="add one typed, fingerprint-bound relationship")
+    graph_connect.add_argument("--from", required=True, dest="source")
+    graph_connect.add_argument("--relation", required=True)
+    graph_connect.add_argument("--to", required=True, dest="target")
+    graph_connect.add_argument("--provenance")
+    graph_connect.add_argument("--dry-run", action="store_true")
+    graph_rebuild = graph_actions.add_parser("rebuild", help="regenerate the non-authoritative graph index")
+    graph_rebuild.add_argument("--dry-run", action="store_true")
+    graph_check = graph_actions.add_parser("check", help="run deterministic graph and evidence checks")
+    graph_check.add_argument("--strict", action="store_true", help="also fail when semantic review is pending")
+    graph_show = graph_actions.add_parser("show")
+    graph_show.add_argument("--claim", required=True)
+    graph_audit = graph_actions.add_parser("audit")
+    graph_audit.add_argument("--claim", required=True)
+    graph_audit.add_argument("--mode", choices=("full-chain",), default="full-chain")
+    graph_audit.add_argument("--dry-run", action="store_true")
+    graph_review = graph_actions.add_parser("review", help="import a fingerprint-bound L2/L3 review file")
+    graph_review.add_argument("--claim", required=True)
+    graph_review.add_argument("--file", required=True, type=Path)
+    graph_review.add_argument("--dry-run", action="store_true")
+    graph_review_input = graph_actions.add_parser("review-input", help="show the current review input fingerprint")
+    graph_review_input.add_argument("--claim", required=True)
+    graph_export = graph_actions.add_parser("export", help="export a derived DOT or JSON graph view")
+    graph_export.add_argument("--output", required=True, type=Path)
+    graph_export.add_argument("--format", choices=("dot", "json"), default="dot")
+    graph_export.add_argument("--dry-run", action="store_true")
     search = evidence_actions.add_parser("search")
     search.add_argument("query")
     zotero = evidence_actions.add_parser("zotero", help="read from the Zotero-owned literature library")
@@ -313,15 +398,32 @@ def parser() -> argparse.ArgumentParser:
     scaffold_artifact.add_argument("--title", required=True)
     scaffold_artifact.add_argument("--type", required=True, dest="artifact_type")
     scaffold_artifact.add_argument("--output", required=True, type=Path)
+    scaffold_problem = scaffold_actions.add_parser("problem")
+    scaffold_problem.add_argument("--output", required=True, type=Path)
+    scaffold_claim = scaffold_actions.add_parser("claim")
+    scaffold_claim.add_argument("--output", required=True, type=Path)
+    scaffold_extraction = scaffold_actions.add_parser("corpus-extraction")
+    scaffold_extraction.add_argument("--corpus", required=True)
+    scaffold_extraction.add_argument("--paper", required=True)
+    scaffold_extraction.add_argument("--output", required=True, type=Path)
+    scaffold_graph_review = scaffold_actions.add_parser("graph-review")
+    scaffold_graph_review.add_argument("--claim", required=True)
+    scaffold_graph_review.add_argument("--output", required=True, type=Path)
 
     preflight = commands.add_parser("preflight", help="validate a draft before a formal atomic write")
-    preflight.add_argument("kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact"))
+    preflight.add_argument(
+        "kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact", "problem", "claim", "corpus-extraction", "graph-review")
+    )
     preflight.add_argument("path", type=Path)
 
     migrate = commands.add_parser("migrate", help="run explicit, previewable project record migrations")
     migrate_actions = migrate.add_subparsers(dest="migration_kind", required=True)
     migrate_paper = migrate_actions.add_parser("paper-verification")
     migrate_paper.add_argument("--dry-run", action="store_true")
+    migrate_graph = migrate_actions.add_parser("corpus-gap-evidence-graph")
+    migrate_graph.add_argument("--dry-run", action="store_true")
+    migrate_graph.add_argument("--plan-fingerprint")
+    migrate_graph.add_argument("--snapshot-dir", type=Path)
 
     hypothesis = commands.add_parser("hypothesis", help="manage falsifiable hypotheses")
     hypothesis_actions = hypothesis.add_subparsers(dest="action", required=True)
@@ -331,6 +433,7 @@ def parser() -> argparse.ArgumentParser:
     hyp_new.add_argument("--observations")
     hyp_new.add_argument("--papers")
     hyp_new.add_argument("--ideas", help="comma-separated formal XIDEA IDs from the current literature matrix")
+    hyp_new.add_argument("--gap", dest="gaps", help="comma-separated human-approved GAP IDs")
     hyp_new.add_argument("--falsification", required=True)
     hyp_show = hypothesis_actions.add_parser("show")
     hyp_show.add_argument("id")
@@ -479,6 +582,82 @@ def execute(args: argparse.Namespace) -> int:
                 print(store.refresh_zotero(args.paper_id, refresh_client))
             else:
                 print(client.bibliography(args.item_keys, args.style, args.locale))
+        elif args.evidence_kind == "corpus":
+            from .corpus_gap import CorpusStore
+            corpora = CorpusStore(project)
+            if args.action == "create":
+                dump(corpora.create(
+                    title=args.title, matrix_id=args.matrix, scope_file=args.scope_file,
+                    created_by=args.created_by, supersedes=args.supersedes, dry_run=args.dry_run,
+                ))
+            elif args.action == "list":
+                dump(corpora.list())
+            elif args.action == "show":
+                dump(corpora.show(args.id))
+            elif args.action == "verify":
+                result = corpora.verify(args.id)
+                dump(result)
+                return 0 if result["valid"] else 1
+            elif args.action == "status":
+                dump(corpora.extraction_status(args.id))
+            elif args.action == "add-extraction":
+                dump(corpora.add_extraction(args.request, dry_run=args.dry_run))
+            else:
+                rationale = args.rationale_file.expanduser().resolve().read_text(encoding="utf-8")
+                dump(corpora.review_extraction(
+                    args.corpus, args.paper, decision=args.decision, reviewer=args.reviewer,
+                    rationale=rationale, dry_run=args.dry_run,
+                ))
+        elif args.evidence_kind == "gap":
+            from .corpus_gap import GapStore
+            gaps = GapStore(project)
+            if args.action == "detect":
+                dump(gaps.detect(args.corpus, args.motifs, dry_run=args.dry_run, test_only=args.test_only))
+            elif args.action == "list":
+                dump(gaps.list(args.state))
+            elif args.action == "show":
+                dump(gaps.show(args.id))
+            else:
+                rationale = args.rationale_file.expanduser().resolve().read_text(encoding="utf-8")
+                dump(gaps.review(
+                    args.id, decision=args.decision, reviewer=args.reviewer,
+                    rationale=rationale, dry_run=args.dry_run,
+                ))
+        elif args.evidence_kind in {"problem", "claim"}:
+            from .evidence_graph import ClaimStore, ProblemStore
+            records = ProblemStore(project) if args.evidence_kind == "problem" else ClaimStore(project)
+            if args.action == "add":
+                dump(records.add_file(args.request, dry_run=args.dry_run))
+            elif args.action == "supersede":
+                dump(records.supersede_file(args.id, args.replacement, dry_run=args.dry_run))
+            elif args.action == "list":
+                dump(records.list())
+            else:
+                dump(records.show(args.id))
+        elif args.evidence_kind == "graph":
+            from .evidence_graph import EvidenceGraphStore
+            graph_store = EvidenceGraphStore(project)
+            if args.action == "connect":
+                dump(graph_store.connect(
+                    args.source, args.relation, args.target,
+                    provenance_refs=csv(args.provenance), dry_run=args.dry_run,
+                ))
+            elif args.action == "rebuild":
+                dump(graph_store.rebuild(dry_run=args.dry_run))
+            elif args.action == "check":
+                result = graph_store.check()
+                dump(result)
+                return 0 if result["valid"] and (not args.strict or result["ready"]) else 1
+            elif args.action == "show":
+                dump(graph_store.claim_view(args.claim))
+            elif args.action == "audit":
+                dump(graph_store.audit(args.claim, dry_run=args.dry_run))
+            elif args.action == "review":
+                dump(graph_store.import_review(args.claim, args.file, dry_run=args.dry_run))
+            elif args.action == "review-input":
+                dump({"claim_id": args.claim, "input_fingerprint": graph_store.review_input_fingerprint(args.claim)})
+            else:
+                dump(graph_store.export(args.output, format=args.format, dry_run=args.dry_run))
         elif args.action == "list":
             dump(store.list(args.evidence_kind))
         elif args.action == "show":
@@ -549,21 +728,40 @@ def execute(args: argparse.Namespace) -> int:
             dump(result)
             return 0 if result["valid"] else 1
     elif args.root_command == "scaffold":
-        from .scaffold import artifact_scaffold, matrix_entry_scaffold, paper_analysis_scaffold, synthesis_idea_scaffold
+        from .scaffold import (
+            artifact_scaffold, claim_scaffold, graph_review_scaffold, matrix_entry_scaffold,
+            paper_analysis_scaffold, problem_scaffold, synthesis_idea_scaffold,
+        )
         if args.scaffold_kind == "paper-analysis":
             print(paper_analysis_scaffold(project, args.paper_id, args.output))
         elif args.scaffold_kind == "matrix-entry":
             print(matrix_entry_scaffold(project, args.paper_id, args.output))
         elif args.scaffold_kind == "synthesis-idea":
             print(synthesis_idea_scaffold(project, args.output))
-        else:
+        elif args.scaffold_kind == "artifact":
             print(artifact_scaffold(args.output, args.path, args.title, args.artifact_type))
+        elif args.scaffold_kind == "problem":
+            print(problem_scaffold(args.output))
+        elif args.scaffold_kind == "claim":
+            print(claim_scaffold(args.output))
+        elif args.scaffold_kind == "corpus-extraction":
+            from .corpus_gap import CorpusStore
+            print(CorpusStore(project).scaffold_extraction(args.corpus, args.paper, args.output))
+        else:
+            print(graph_review_scaffold(project, args.claim, args.output))
     elif args.root_command == "preflight":
         from .scaffold import preflight
         dump(preflight(project, args.kind, args.path))
     elif args.root_command == "migrate":
-        from .review import migrate_paper_verification
-        dump(migrate_paper_verification(project, dry_run=args.dry_run))
+        if args.migration_kind == "paper-verification":
+            from .review import migrate_paper_verification
+            dump(migrate_paper_verification(project, dry_run=args.dry_run))
+        else:
+            from .migration import migrate_corpus_gap_evidence_graph
+            dump(migrate_corpus_gap_evidence_graph(
+                project, dry_run=args.dry_run, plan_fingerprint=args.plan_fingerprint,
+                snapshot_dir=args.snapshot_dir,
+            ))
     elif args.root_command == "hypothesis":
         if args.action == "show":
             metadata, body = show_record(project, args.id)
@@ -572,7 +770,7 @@ def execute(args: argparse.Namespace) -> int:
         else:
             record_id = add_hypothesis(
                 project, args.title, args.statement, csv(args.observations), csv(args.papers),
-                args.falsification, ideas=csv(args.ideas),
+                args.falsification, ideas=csv(args.ideas), gaps=csv(args.gaps),
             )
             metadata, _ = show_record(project, record_id)
             from .records import hypothesis_provenance_status

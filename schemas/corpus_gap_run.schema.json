@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "corpus_id", "corpus_fingerprint", "motif_version", "input_fingerprint", "candidate_gaps", "created_at", "test_only"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^CGAPRUN-[0-9]{6}$"},
+    "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+    "corpus_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "motif_version": {"type": "string", "minLength": 1},
+    "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidate_gaps": {"type": "array", "items": {"type": "string", "pattern": "^GAP-[0-9]{4}$"}, "uniqueItems": true},
+    "created_at": {"type": "string", "minLength": 1},
+    "test_only": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

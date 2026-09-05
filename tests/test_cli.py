@@ -1,6 +1,9 @@
 import os
+import argparse
 import subprocess
 import sys
+
+import pytest
 
 from researchflow.cli import _configure_utf8_output, main, parser
 from researchflow.project import ResearchProject
@@ -182,3 +185,51 @@ def test_literature_matrix_cli_arguments_route_to_matrix():
     assert synthesis_args.root_command == "evidence"
     assert synthesis_args.evidence_kind == "matrix"
     assert synthesis_args.action == "synthesize"
+
+
+def test_corpus_gap_graph_and_migration_cli_routes():
+    corpus = parser().parse_args([
+        "evidence", "corpus", "create", "--matrix", "LITMATRIX-0001",
+        "--title", "TEST", "--scope-file", "scope.yaml", "--dry-run",
+    ])
+    assert (corpus.root_command, corpus.evidence_kind, corpus.action) == ("evidence", "corpus", "create")
+
+    gap = parser().parse_args([
+        "evidence", "gap", "detect", "--corpus", "CORPUS-0001",
+        "--motifs", "motifs.yaml", "--test-only", "--dry-run",
+    ])
+    assert (gap.evidence_kind, gap.action, gap.test_only) == ("gap", "detect", True)
+
+    review = parser().parse_args([
+        "evidence", "graph", "review", "--claim", "CLAIM-0001", "--file", "review.yaml",
+    ])
+    assert (review.evidence_kind, review.action, str(review.file)) == ("graph", "review", "review.yaml")
+
+    migration = parser().parse_args([
+        "migrate", "corpus-gap-evidence-graph", "--dry-run", "--snapshot-dir", "snapshots",
+    ])
+    assert (migration.root_command, migration.migration_kind, migration.dry_run) == (
+        "migrate", "corpus-gap-evidence-graph", True,
+    )
+
+
+def test_every_cli_parser_node_has_working_help(capsys):
+    root = parser()
+    routes = [[]]
+
+    def visit(current, prefix):
+        for action in current._actions:
+            if not isinstance(action, argparse._SubParsersAction):
+                continue
+            for name, child in action.choices.items():
+                route = [*prefix, name]
+                routes.append(route)
+                visit(child, route)
+
+    visit(root, [])
+    for route in routes:
+        with pytest.raises(SystemExit) as stopped:
+            root.parse_args([*route, "--help"])
+        assert stopped.value.code == 0, route
+    assert len(routes) >= 140
+    capsys.readouterr()

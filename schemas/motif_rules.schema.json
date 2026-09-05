@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "match": {
+      "type": "object",
+      "properties": {
+        "subject_type": {"enum": ["Paper", "Method", "Task", "Dataset", "Metric", "Assumption", "Result", "Limitation", "FailureCondition"]},
+        "relation": {"enum": ["proposes", "evaluated_on", "uses_dataset", "measured_by", "improves_over", "fails_under", "assumes", "limited_by", "contradicts"]},
+        "object_type": {"enum": ["Paper", "Method", "Task", "Dataset", "Metric", "Assumption", "Result", "Limitation", "FailureCondition"]},
+        "subject_key": {"type": "string", "minLength": 1},
+        "object_key": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "score": {
+      "type": "object",
+      "required": ["value", "kind", "algorithm"],
+      "properties": {
+        "value": {"type": "number", "minimum": 0, "maximum": 1},
+        "kind": {"const": "heuristic"},
+        "algorithm": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "version", "rules"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "version": {"type": "string", "minLength": 1},
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "motif", "problem_id", "title", "statement", "mechanism_missing", "remaining_scope", "boundary_conditions", "falsification", "tuple_match", "scores"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+          "motif": {"enum": ["missing_edge", "assumption_failure", "evaluation_blind_spot", "contradictory_results", "dataset_method_mismatch"]},
+          "problem_id": {"type": "string", "pattern": "^PROB-[0-9]{4}$"},
+          "title": {"type": "string", "minLength": 1},
+          "statement": {"type": "string", "minLength": 1},
+          "mechanism_missing": {"type": "string", "minLength": 1},
+          "remaining_scope": {"type": "string", "minLength": 1},
+          "boundary_conditions": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+          "falsification": {"type": "string", "minLength": 1},
+          "tuple_match": {"$ref": "#/$defs/match"},
+          "absence_match": {"$ref": "#/$defs/match"},
+          "contradiction_match": {"$ref": "#/$defs/match"},
+          "known_counterevidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["ref", "effect", "rationale"],
+              "properties": {
+                "ref": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+                "effect": {"enum": ["partially_addresses", "fully_addresses", "contradicts"]},
+                "rationale": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": false
+            }
+          },
+          "scores": {
+            "type": "object",
+            "required": ["novelty", "feasibility"],
+            "properties": {"novelty": {"$ref": "#/$defs/score"}, "feasibility": {"$ref": "#/$defs/score"}},
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

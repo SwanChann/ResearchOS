@@ -140,10 +140,14 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
         except ResearchFlowError as exc:
             checks.append(Check(f"project {candidate} snapshot", True, str(exc), "warning"))
         canonical = [
+            project.root / "memory" / "problems",
+            project.root / "memory" / "gaps",
             project.root / "memory" / "observations",
             project.root / "memory" / "hypotheses",
+            project.root / "memory" / "claims",
             project.root / "memory" / "decisions",
             project.root / "evidence" / "papers" / "analysis",
+            project.root / "evidence" / "corpora",
             project.root / "evidence" / "repos" / "manifests",
             project.root / "experiments" / "cards",
         ]
@@ -198,6 +202,61 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
                 ))
             except ResearchFlowError as exc:
                 checks.append(Check(f"project {candidate} literature matrix", False, str(exc)))
+        try:
+            from .corpus_gap import CorpusStore, GapStore
+            corpora = CorpusStore(project)
+            corpus_values = corpora.list()
+            corpus_issues = []
+            for corpus in corpus_values:
+                verification = corpora.verify(corpus["id"])
+                corpus_issues.extend(f"{corpus['id']}: {issue}" for issue in verification["issues"])
+                extraction = corpora.extraction_status(corpus["id"])
+                for item in extraction["extractions"]:
+                    if item["status"] not in {"missing", "accepted"} or (item["status"] == "accepted" and not item["current"]):
+                        corpus_issues.append(f"{corpus['id']}/{item['paper_id']}: extraction {item['status']} or stale")
+            gap_issues = []
+            for gap in GapStore(project).list():
+                shown = GapStore(project).show(gap["id"])
+                if not shown["content_current"]:
+                    gap_issues.append(f"{gap['id']}: candidate fingerprint stale")
+                if gap["state"] == "approved" and not shown["approved"]:
+                    gap_issues.append(f"{gap['id']}: approval stale")
+            issues = [*corpus_issues, *gap_issues]
+            checks.append(Check(
+                f"project {candidate} corpus gap",
+                not issues,
+                f"{len(corpus_values)} Corpus record(s), {len(GapStore(project).list())} Gap record(s)"
+                if not issues else "; ".join(issues),
+                "pass" if corpus_values or GapStore(project).list() else "warning",
+            ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} corpus gap", False, str(exc)))
+        try:
+            from .evidence_graph import EvidenceGraphStore
+            graph = EvidenceGraphStore(project).check()
+            if not graph["initialized"]:
+                checks.append(Check(
+                    f"project {candidate} evidence graph",
+                    True,
+                    "not initialized; legacy project remains readable and no migration was performed",
+                    "warning",
+                ))
+            else:
+                detail = f"{graph['edges']} edge(s); deterministic structure valid"
+                if not graph["index"]["exists"]:
+                    detail += "; derived index missing"
+                elif not graph["index"]["current"]:
+                    detail += "; derived index stale"
+                if graph["claims"] and not graph["ready"]:
+                    detail += "; one or more Claims await complete evidence or semantic review"
+                checks.append(Check(
+                    f"project {candidate} evidence graph",
+                    graph["valid"],
+                    detail if graph["valid"] else "; ".join(graph["issues"]),
+                    "pass" if (graph["ready"] or not graph["claims"]) and graph["index"]["current"] else "warning",
+                ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} evidence graph", False, str(exc)))
     duplicates = sorted({value for value in ids if ids.count(value) > 1})
     checks.append(Check("duplicate record IDs", not duplicates, ", ".join(duplicates) if duplicates else "none"))
     # GPU availability is reported by compute probe; doctor only verifies configured machine shape.

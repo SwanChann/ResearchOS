@@ -26,6 +26,21 @@ rf evidence matrix review --reviewer NAME --decision DECISION --scope TEXT
 rf evidence matrix validate|render|show
 rf evidence repo add --name NAME --commit SHA (--url URL | --local PATH)
 rf evidence repo list|show|search
+rf evidence problem add REQUEST.yaml [--dry-run]
+rf evidence problem list|show
+rf evidence claim add REQUEST.yaml [--dry-run]
+rf evidence claim list|show|supersede
+rf evidence corpus create|list|show|verify|status|add-extraction|review-extraction
+rf evidence gap detect --corpus ID --motifs FILE [--test-only] [--dry-run]
+rf evidence gap list|show|review
+rf evidence graph connect --from ID --relation RELATION --to ID [--provenance IDS] [--dry-run]
+rf evidence graph rebuild [--dry-run]
+rf evidence graph check [--strict]
+rf evidence graph show --claim CLAIM-ID
+rf evidence graph audit --claim CLAIM-ID [--mode full-chain] [--dry-run]
+rf evidence graph review-input --claim CLAIM-ID
+rf evidence graph review --claim CLAIM-ID --file REVIEW.yaml [--dry-run]
+rf evidence graph export --output PATH [--format dot|json] [--dry-run]
 rf evidence search QUERY
 rf evidence zotero configure [--base-url LOOPBACK_API] [--library users/0]
 rf evidence zotero status [--verbose]
@@ -41,10 +56,12 @@ rf memory decision add|show
 rf artifact add|list|show|verify|refresh|supersede|migrate
 rf knowledge rebuild [--dry-run]
 rf knowledge check
-rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact
-rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact FILE
+rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact|problem|claim|corpus-extraction|graph-review
+rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact|problem|claim|corpus-extraction|graph-review FILE
 rf migrate paper-verification [--dry-run]
-rf hypothesis new|show [--ideas XIDEA-0001,...]
+rf migrate corpus-gap-evidence-graph --dry-run [--snapshot-dir DIR]
+rf migrate corpus-gap-evidence-graph --plan-fingerprint SHA256 [--snapshot-dir DIR]
+rf hypothesis new|show [--ideas XIDEA-0001,...] [--gap GAP-0001]
 rf daily
 rf doctor [--strict] [--probe-machines]
 ```
@@ -64,6 +81,10 @@ The literature matrix lives at `.research/literature_matrix.md`. New matrices de
 Artifact commands operate on `.research/artifacts.yaml`. Registered paths must resolve inside the project workspace. `verify` checks existence, hash, and linked IDs only. `refresh` deliberately accepts a new file hash; `supersede` retains the historical file and bidirectional chain. `artifact migrate --scan PATH --dry-run` lists legacy candidates without changing them; a real migration creates a snapshot and registers them as drafts.
 
 `knowledge rebuild` replaces only the delimited generated region and is idempotent. `knowledge check` reports stale registry coverage, broken links, and superseded-current mistakes. Concise `status` includes registry counts; `status --verbose` exposes individual entries and artifact integrity.
+
+Problem, Claim, extraction, and graph-review scaffolds are Agent-editable drafts. `preflight claim` requires exact registered metric evidence and does not call a model or external service. `graph connect` adds a typed edge only when endpoint records and relation-specific references agree; reconnecting changed endpoints creates a new fingerprint-bound edge and preserves the old one as superseded. `graph rebuild` writes only the disposable index. `graph review` imports an explicit fingerprint-bound L2/L3 result; it never silently invokes a provider. `graph check --strict` remains non-zero until required review passes.
+
+Corpus creation freezes the selected matrix fingerprint and each included paper source fingerprint. Extraction acceptance and Gap approval are explicit human gates. Gap detection is deterministic for a fixed Corpus, accepted extraction set, motif version, and `test_only` flag. Migration only maps exact legacy references, creates no inferred Problem/Gap/Claim, requires the reviewed dry-run fingerprint, and verifies a snapshot before authority files change.
 
 Experiment and run commands:
 

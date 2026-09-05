@@ -16,13 +16,18 @@ rf snapshot create|list|show|verify|restore
 rf evidence paper add|list|show|verify|review
 rf evidence matrix templates|axes|init|add|synthesize|migrate|review|validate|render|show
 rf evidence repo add|list|show|search
+rf evidence problem add|list|show
+rf evidence claim add|list|show
+rf evidence corpus create|list|show|verify|status|add-extraction|review-extraction
+rf evidence gap detect|list|show|review
+rf evidence graph connect|rebuild|check|show|audit|review-input|review|export
 rf evidence search QUERY
 rf evidence zotero configure|status|doctor|libraries|collections|search|show|bibliography|link|refresh
 rf artifact add|list|show|verify|refresh|supersede|migrate
 rf knowledge rebuild|check
-rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact
-rf preflight KIND FILE
-rf migrate paper-verification
+rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact|problem|claim|corpus-extraction|graph-review
+rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact|problem|claim|corpus-extraction|graph-review FILE
+rf migrate paper-verification|corpus-gap-evidence-graph
 rf memory observation add|show
 rf memory decision add|show
 rf hypothesis new|show
@@ -75,3 +80,7 @@ Zotero operations stay under `evidence zotero`: Zotero owns retrieval, organizat
 `evidence matrix` manages one project-level `.research/literature_matrix.md`. YAML frontmatter is the authoritative structured record; the Markdown comparison tables are a deterministic view. `add` accepts one YAML paper entry, requires a verified `PAPER-*`, rejects duplicate papers or missing/unknown axes, and validates every supported cell's page and claim references before an atomic rewrite. `synthesize` consumes a separate schema-checked update in `replace` or `upsert` mode, verifies every cross-paper claim reference, writes atomically, and treats an unchanged replay as a no-op.
 
 Matrix axes come from a named template or confirmed project YAML. They lock after first insertion. `migrate` is the only supported semantic axes change and preserves superseded values/evidence. Artifact paths are confined to the project workspace; Knowledge is a generated view, not an alternative authority.
+
+`PROB-*` and `CLAIM-*` are Markdown records with validated YAML frontmatter. Claim import is always `draft` and requires exact Finding, Run, Artifact hash, JSON Pointer, metric value, scope, and qualifier fields. `.research/evidence-graph/edges.yaml` is an authoritative typed relation ledger; `.research/evidence-graph/index.json` is a rebuildable projection. Graph L1 checks are deterministic. Missing or unavailable L2 semantic review fails closed and cannot produce `evidence_ready`.
+
+`CORPUS-*` freezes matrix and paper fingerprints; per-paper extraction files preserve structured tuples and locators. `CGAPRUN-*` records deterministic motif inputs and marks fixtures with `test_only`. `GAP-*` remains a candidate until a non-empty `human:*` reviewer explicitly approves its current fingerprint. L2/L3 review and 0.5.0 migration are file-driven, preflightable, and snapshot/fingerprint gated rather than provider-coupled.

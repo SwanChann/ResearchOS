@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "migration", "project_id", "input_fingerprint", "plan_fingerprint", "edges", "unmapped", "snapshot", "rollback", "created_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "migration": {"const": "corpus-gap-evidence-graph-v1"},
+    "project_id": {"type": "string", "minLength": 1},
+    "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "plan_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "edges": {"type": "array", "items": {"type": "object"}},
+    "unmapped": {"type": "array", "items": {"type": "object"}},
+    "snapshot": {"type": "string", "minLength": 1},
+    "rollback": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

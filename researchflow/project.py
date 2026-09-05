@@ -14,8 +14,11 @@ from .schema import validate_record
 
 WORKSPACE_DIRS = (
     ".research",
+    ".research/evidence-graph/audits", ".research/corpus-gap/runs", ".research/migrations",
     "memory/observations", "memory/hypotheses", "memory/decisions",
+    "memory/problems", "memory/gaps", "memory/claims",
     "evidence/papers/pdf", "evidence/papers/analysis",
+    "evidence/corpora", "evidence/corpus-extractions",
     "evidence/repos/manifests", "evidence/repos/notes",
     "experiments/cards", "experiments/reports", "runs", "notes/daily", "skills",
 )
@@ -37,8 +40,17 @@ KNOWLEDGE = """# Knowledge Index
 ## Observations
 `memory/observations/`
 
+## Problems
+`memory/problems/`
+
+## Gaps
+`memory/gaps/`
+
 ## Hypotheses
 `memory/hypotheses/`
+
+## Claims
+`memory/claims/`
 
 ## Decisions
 `memory/decisions/`
@@ -54,6 +66,9 @@ KNOWLEDGE = """# Knowledge Index
 
 ## Runs
 `runs/registry.jsonl`
+
+## Evidence Graph
+`.research/evidence-graph/edges.yaml`
 """
 
 AGENT_RULES = """# Project Agent Protocol
@@ -183,6 +198,10 @@ def add_project(project_id: str, repo: Path, name: str | None = None, config: di
     from .knowledge import KnowledgeStore
     artifacts = ArtifactStore(project)
     artifacts.initialize()
+    from .evidence_graph import EvidenceGraphStore
+    graph = EvidenceGraphStore(project)
+    graph.initialize()
+    graph.rebuild()
     KnowledgeStore(project).rebuild()
     return workspace
 
@@ -244,6 +263,13 @@ class ResearchProject:
             "next_action": state.get("Next Action"),
             "registry_summary": knowledge.summary(),
             "knowledge_navigation": knowledge.check(),
+            "evidence_graph": __import__(
+                "researchflow.evidence_graph", fromlist=["EvidenceGraphStore"]
+            ).EvidenceGraphStore(self).summary(),
+            "corpus_gap": {
+                **__import__("researchflow.corpus_gap", fromlist=["CorpusStore"]).CorpusStore(self).summary(),
+                **__import__("researchflow.corpus_gap", fromlist=["GapStore"]).GapStore(self).summary(),
+            },
         }
         if verbose:
             result["registry_entries"] = knowledge.inventory()

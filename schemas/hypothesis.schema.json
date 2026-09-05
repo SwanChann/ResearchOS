@@ -10,7 +10,8 @@
       "properties": {
         "observations": {"type": "array", "items": {"type": "string", "pattern": "^OBS-[0-9]{4}$"}},
         "papers": {"type": "array", "items": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"}},
-        "ideas": {"type": "array", "items": {"type": "string", "pattern": "^XIDEA-[0-9]{3,4}$"}}
+        "ideas": {"type": "array", "items": {"type": "string", "pattern": "^XIDEA-[0-9]{3,4}$"}},
+        "gaps": {"type": "array", "items": {"type": "string", "pattern": "^GAP-[0-9]{4}$"}, "uniqueItems": true}
       },
       "additionalProperties": false
     },
@@ -35,6 +36,20 @@
               "idea_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
               "novelty": {"enum": ["unchecked", "checked"]},
               "evidence": {"type": "array", "items": {"type": "object"}}
+            },
+            "additionalProperties": false
+          }
+        },
+        "gap_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "gap_fingerprint", "reviewer", "reviewed_at"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^GAP-[0-9]{4}$"},
+              "gap_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "reviewer": {"type": "string", "pattern": "^human:.+"},
+              "reviewed_at": {"type": "string", "minLength": 1}
             },
             "additionalProperties": false
           }

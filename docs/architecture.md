@@ -27,7 +27,7 @@ The functional core validates records, IDs, transitions, scope, and provenance. 
 <remote workspace>/               persistent remote repos/worktrees/runs
 ```
 
-Project files are authoritative. JSONL registries are append-friendly event/index layers; experiment cards and run records remain authoritative records. `.research/artifacts.yaml` is the atomic Artifact registry, while `KNOWLEDGE.md` contains a delimited generated navigation view plus user-owned prose.
+Project files are authoritative. JSONL registries are append-friendly event/index layers; experiment cards and run records remain authoritative records. `.research/artifacts.yaml` is the atomic Artifact registry. `.research/evidence-graph/edges.yaml` is the typed relationship authority while its `index.json` is deterministically rebuildable. `KNOWLEDGE.md` contains a delimited generated navigation view plus user-owned prose.
 
 Snapshots are portable ZIP containers with a hashed manifest and safe manual extraction. Creation uses a temporary target followed by atomic replacement. Restore defaults to a new directory; in-place restore creates a recoverable sibling copy before replacement. Repositories, Zotero PDFs, datasets, weights, and other external authorities are referenced in the manifest but excluded by default.
 
@@ -62,7 +62,8 @@ The Python package is deliberately flat. Modules correspond to stable nouns (`pr
 - The Zotero adapter accepts loopback `/api` URLs only, implements `GET` only, and never requests or stores a write key. Its doctor classifies configuration, transport, identity, item/library, and local attachment-path failures without downloading attachments.
 - Schema/contract validation, source fingerprinting, human review, reproduction, and scientific establishment are separate layers. Reviews are bound to content fingerprints and become stale after relevant content changes.
 - Matrix axes are embedded and versioned. They lock on first insertion; changes require a mapping file, dry-run, automatic snapshot, preserved superseded cells, and migration provenance.
+- EvidenceGraph endpoints resolve back to ordinary authoritative records and bind edges to both endpoint fingerprints. Changed endpoints require a new edge that explicitly supersedes the old version. Structural/metric checks, semantic review, reproduction, and scientific establishment remain distinct.
 
 ## Deliberate omissions
 
-V0.5.0 has no GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. Snapshots are project-workspace copies, not a scheduler or complete machine backup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it.
+V0.6.0 has no built-in autonomous semantic reviewer, automatic graph repair loop, GUI, database, vector store, cloud sync, multi-agent runtime, autonomous endless loop, remote cancellation, or automatic retention cleanup. L2/L3 review is a provider-neutral, fingerprint-bound import. CorpusGap outputs remain heuristic candidates behind human gates. Snapshots are project-workspace copies, not a scheduler or complete machine backup. The real SSH path has only been validated with a CPU-only `TEST / MOCK` fixture; no GPU/heavy validation or scientific claim follows from it.

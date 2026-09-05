@@ -26,7 +26,7 @@ The core commands to remember are:
 
 ```text
 rf status       current question, HYP/EXP/RUN state, next action
-rf evidence     Zotero-linked paper analysis and pinned-code evidence
+rf evidence     literature/code evidence plus typed EvidenceGraph chains
 rf experiment   card, worktree, preflight, bounded execution
 rf run          provenance, logs, metrics, artifacts
 rf doctor       local config, schemas, tools, paths, references, IDs
@@ -106,15 +106,38 @@ The server must already contain the project repository at `<workspace-root>/repo
   AGENTS.md
   KNOWLEDGE.md
   skills/
-  memory/{current-state.md,observations/,hypotheses/,decisions/}
-  evidence/{papers/,repos/}
-  .research/{literature_matrix.md,artifacts.yaml}
+  memory/{current-state.md,problems/,gaps/,observations/,hypotheses/,claims/,decisions/}
+  evidence/{papers/,repos/,corpora/,corpus-extractions/}
+  .research/{literature_matrix.md,artifacts.yaml,evidence-graph/,corpus-gap/,migrations/}
   experiments/{cards/,registry.jsonl,reports/}
   runs/{registry.jsonl,RUN-*/}
   notes/daily/
 ```
 
 No database is authoritative. Datasets and large checkpoints stay in their configured local/remote locations; run records contain references and hashes where practical.
+
+## Problems, Claims, and EvidenceGraph
+
+ResearchFlow 0.6.0 implements RFC-0001: frozen verified-paper Corpora, reviewed structured extractions, deterministic Gap candidates, human-only Gap approval, formal `PROB-*`/`CLAIM-*` records, and a typed EvidenceGraph. Claim preflight resolves an `experimental_result` Observation, a succeeded Run, an Artifact SHA-256, an exact JSON Pointer, and the recorded metric value. A passing structural check does not establish semantic validity or scientific truth.
+
+```powershell
+rf scaffold problem --output .\problem.yaml
+rf preflight problem .\problem.yaml
+rf evidence problem add .\problem.yaml --dry-run
+
+rf scaffold claim --output .\claim.yaml
+rf preflight claim .\claim.yaml
+rf evidence claim add .\claim.yaml --dry-run
+rf evidence graph connect --from HYP-0001 --relation tested_by --to EXP-0001
+rf evidence graph review-input --claim CLAIM-0001
+rf evidence graph review --claim CLAIM-0001 --file .\graph-review.yaml
+rf evidence graph check --strict
+rf evidence graph rebuild --dry-run
+```
+
+`.research/evidence-graph/edges.yaml` is the authoritative relationship ledger. `index.json` is a deterministic, disposable index. `--strict` remains non-zero while a Claim lacks a complete `HYP -> EXP -> OBS -> CLAIM` chain or a current imported L2 semantic approval. The provider-neutral review contract records L2/L3 provenance but does not silently call a model. Migration from 0.5.0 is exact-reference-only, dry-run/fingerprint gated, snapshot-backed, and must be explicitly applied per project.
+
+CorpusGap never converts a paper summary directly into an accepted research direction. It freezes the current verified matrix, imports locator-bound tuples, requires `human:*` acceptance for every extraction, produces deterministic heuristic candidates, and requires another explicit `human:*` approval before `hypothesis new --gap` is allowed. Use `--test-only` for fixtures and mock evaluations.
 
 ## Use from any folder or a new chat
 
@@ -192,6 +215,7 @@ python -m pytest tests/test_e2e_toy.py -q
 - [Prompt: continue an existing project](docs/prompts/continue-existing-project.md)
 - [Prompt: start a new topic](docs/prompts/start-new-topic.md)
 - [System-build handoff](docs/handoffs/researchflow-system-build.md)
+- [RFC-0001: CorpusGap + EvidenceGraph](docs/rfcs/RFC-0001-corpus-gap-evidence-graph.md)
 
 ## Current limitations
 
@@ -202,5 +226,8 @@ python -m pytest tests/test_e2e_toy.py -q
 - The cross-paper matrix has versioned templates/custom axes, explicit migration, completeness/evidence validation, and deterministic rendering. Its cells still require primary-source reading; scaffolded text is an agent-generated draft, not a scientific judgment.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
+- CorpusGap motif scores are explicitly heuristic. They do not prove novelty, openness of a Gap, feasibility, or top-conference potential; human review and current primary-source checks remain required.
+- EvidenceGraph has no autonomous repair loop or built-in model provider. L2/L3 results enter through a fingerprint-bound review file, so unavailable review fails closed rather than being treated as a pass.
+- Existing projects remain readable without migration. Real migration is never triggered by `status`, `doctor`, package installation, or schema availability; it requires an explicit dry-run fingerprint and a verified snapshot.
 
-The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, additional deep reads, remote cancellation, and retention automation remain separate workflows and do not block the V0.5.0 system boundary.
+The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, additional deep reads, real-project migration, remote cancellation, and retention automation remain separately authorized workflows and do not block the V0.6.0 software boundary.

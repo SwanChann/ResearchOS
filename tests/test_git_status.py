@@ -86,6 +86,22 @@ def test_git_state_clean_dirty_untracked_and_detached(tmp_path):
     assert detached.head_commit
 
 
+def test_git_state_decodes_unquoted_chinese_paths_as_utf8(tmp_path):
+    repo = tmp_path / "repo"
+    _init(repo, commit=True)
+    _git(repo, "config", "core.quotepath", "false")
+    chinese = repo / "中文目录" / "研究记录.md"
+    chinese.parent.mkdir()
+    chinese.write_text("TEST\n", encoding="utf-8")
+
+    state = inspect_git_state(repo)
+
+    assert state.error is None
+    assert state.clean is False
+    assert state.tracked_modifications == 0
+    assert state.untracked_files == 1
+
+
 def test_doctor_warns_for_unborn_and_dirty_without_changing_default_exit_code(rf_env, capsys):
     _init(rf_env["repo"])
     add_project("toy", rf_env["repo"])

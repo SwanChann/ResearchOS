@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["target", "target_fingerprint", "reviewer", "semantic_review", "fidelity_review", "provenance"],
+  "properties": {
+    "target": {"type": "string", "pattern": "^CLAIM-[0-9]{4}$"},
+    "target_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "reviewer": {"type": "string", "minLength": 1},
+    "semantic_review": {
+      "type": "object",
+      "required": ["status", "rationale", "experiment_falsifiable", "claim_within_findings"],
+      "properties": {
+        "status": {"enum": ["pass", "fail", "unavailable"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "experiment_falsifiable": {"enum": ["pass", "fail", "unavailable"]},
+        "claim_within_findings": {"enum": ["pass", "fail", "unavailable"]}
+      },
+      "additionalProperties": false
+    },
+    "fidelity_review": {
+      "type": "object",
+      "required": ["status", "failures", "rationale"],
+      "properties": {
+        "status": {"enum": ["pending", "pass", "fail", "unavailable"]},
+        "failures": {"type": "array", "items": {"enum": ["M1", "M2", "M3", "M4", "M5"]}, "uniqueItems": true},
+        "rationale": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["provider", "model", "prompt_version", "input_fingerprint"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "objective", "scope", "constraints", "application_context", "status", "created_at", "supersedes", "request_fingerprint"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^PROB-[0-9]{4}$"},
+    "title": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "constraints": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "application_context": {"type": "string", "minLength": 1},
+    "status": {"enum": ["active", "inactive", "superseded"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "supersedes": {"type": ["string", "null"], "pattern": "^PROB-[0-9]{4}$"},
+    "request_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
