@@ -30,6 +30,18 @@ ALLOWED_RELATIONS: dict[str, tuple[set[str], set[str]]] = {
     "supports_gap": ({"PAPER"}, {"GAP"}),
     "weakens_gap": ({"PAPER"}, {"GAP"}),
     "substantiates": ({"ARTIFACT"}, {"OBS", "CLAIM"}),
+    "same_problem": ({"PAPER"}, {"PAPER"}),
+    "same_method_family": ({"PAPER"}, {"PAPER"}),
+    "extends_method": ({"PAPER"}, {"PAPER"}),
+    "replaces_component": ({"PAPER"}, {"PAPER"}),
+    "shares_assumption": ({"PAPER"}, {"PAPER"}),
+    "relaxes_assumption": ({"PAPER"}, {"PAPER"}),
+    "same_evaluation": ({"PAPER"}, {"PAPER"}),
+    "contradicts_result": ({"PAPER"}, {"PAPER"}),
+    "addresses_limitation": ({"PAPER"}, {"PAPER"}),
+    "exposes_failure": ({"PAPER"}, {"PAPER"}),
+    "counterevidence": ({"PAPER"}, {"PAPER"}),
+    "boundary_case": ({"PAPER"}, {"PAPER"}),
 }
 DEPENDENCY_RELATIONS = {"identifies", "motivates", "tested_by", "produces"}
 
@@ -128,6 +140,10 @@ class RecordResolver:
             data = read_yaml(path)
             validate_record("corpus_gap_run", data)
             return self._resolved(identifier, kind, path, data)
+        if kind == "PADJ":
+            from .adjacency import PaperAdjacencyStore
+            shown = PaperAdjacencyStore(self.project).show(identifier)
+            return self._resolved(identifier, kind, PaperAdjacencyStore(self.project).path, shown["edge"])
         if kind in self.MARKDOWN:
             folder, schema = self.MARKDOWN[kind]
             path = self.project.root / folder / f"{identifier}.md"
@@ -644,6 +660,20 @@ class EvidenceGraphStore:
                     item.get("ref") for item in target["data"].get("known_counterevidence", [])
                 }:
                     issues.append(f"{edge['id']} Paper is not declared as Gap counterevidence")
+        elif source["kind"] == "PAPER" and target["kind"] == "PAPER":
+            from .adjacency import PaperAdjacencyStore
+            adjacency_refs = [ref for ref in edge["provenance_refs"] if _prefix(ref) == "PADJ"]
+            if len(adjacency_refs) != 1:
+                issues.append(f"{edge['id']} PAPER relation requires exactly one PADJ provenance record")
+            else:
+                shown = PaperAdjacencyStore(self.project).show(adjacency_refs[0])
+                adjacency = shown["edge"]
+                if not shown["usable_for_gap"]:
+                    issues.append(f"{edge['id']} Paper adjacency is not current and human-accepted")
+                if (adjacency["from"], adjacency["relation"], adjacency["to"]) != (
+                    edge["from"], edge["relation"], edge["to"]
+                ):
+                    issues.append(f"{edge['id']} conflicts with PADJ relationship")
         return issues
 
     def check(self) -> dict[str, Any]:

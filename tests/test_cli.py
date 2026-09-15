@@ -213,6 +213,24 @@ def test_corpus_gap_graph_and_migration_cli_routes():
     )
 
 
+def test_paper_adjacency_cli_routes():
+    build = parser().parse_args(["evidence", "adjacency", "build", "--corpus", "CORPUS-0001", "--dry-run"])
+    assert (build.evidence_kind, build.action, build.corpus, build.dry_run) == (
+        "adjacency", "build", "CORPUS-0001", True,
+    )
+    neighbors = parser().parse_args(["evidence", "adjacency", "neighbors", "PAPER-0001", "--top-k", "5"])
+    assert (neighbors.action, neighbors.paper_id, neighbors.top_k, neighbors.status) == (
+        "neighbors", "PAPER-0001", 5, "accepted",
+    )
+    scaffold = parser().parse_args([
+        "scaffold", "paper-adjacency", "--corpus", "CORPUS-0001",
+        "--from", "PAPER-0001", "--to", "PAPER-0002", "--output", "adjacency.yaml",
+    ])
+    assert (scaffold.scaffold_kind, scaffold.source, scaffold.target) == (
+        "paper-adjacency", "PAPER-0001", "PAPER-0002",
+    )
+
+
 def test_every_cli_parser_node_has_working_help(capsys):
     root = parser()
     routes = [[]]

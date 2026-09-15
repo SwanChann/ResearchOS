@@ -17,6 +17,7 @@ Machine-readable JSON Schemas live in `schemas/` and are packaged as installatio
 - `corpus_scope` / `corpus`: a declared review scope plus frozen matrix and verified-paper source fingerprints.
 - `corpus_extraction_request` / `corpus_extraction`: locator-bound normalized tuples, immutable content fingerprint, and append-only human review history.
 - `motif_rules` / `gap` / `corpus_gap_run`: deterministic candidate derivation, explicitly heuristic scores, human approval, counterevidence, and TEST/MOCK isolation.
+- `paper_adjacency_request` / `paper_adjacency`: evidence-bound PAPER-to-PAPER candidate import, deterministic build provenance, Paper-analysis fingerprints, human review, and staleness.
 - `evidence_graph_review_request`: provider-neutral, input-fingerprint-bound L2/L3 import.
 - `evidence_graph_migration`: reviewed exact-reference migration, verified snapshot path, and rollback command.
 - `metric_alias_map`: versioned exact alias mapping for metric paths; fuzzy matching remains forbidden.

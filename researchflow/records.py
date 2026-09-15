@@ -45,6 +45,13 @@ def record_exists(project: ResearchProject, ref: str) -> bool:
         return (project.root / ".research" / "corpus-gap" / "runs" / ref / "manifest.yaml").is_file()
     if prefix == "EGAUDIT":
         return (project.root / ".research" / "evidence-graph" / "audits" / f"{ref}.yaml").is_file()
+    if prefix == "PADJ":
+        try:
+            from .adjacency import PaperAdjacencyStore
+            PaperAdjacencyStore(project).show(ref)
+            return True
+        except ResearchFlowError:
+            return False
     folder = locations.get(prefix)
     if folder is None:
         return False
@@ -103,6 +110,7 @@ def broken_references(project: ResearchProject) -> list[str]:
         values = [metadata.get("problem_id")]
         derivation = metadata.get("derivation", {})
         values.extend([derivation.get("corpus_id"), derivation.get("cgap_run_id")])
+        values.extend(derivation.get("adjacency_ids", []))
         values.extend(item.get("ref") for item in metadata.get("known_counterevidence", []))
         if metadata.get("supersedes"):
             values.append(metadata["supersedes"])

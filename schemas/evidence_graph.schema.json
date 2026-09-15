@@ -13,7 +13,7 @@
         "properties": {
           "id": {"type": "string", "pattern": "^EDGE-[0-9a-f]{16}$"},
           "from": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
-          "relation": {"enum": ["identifies", "motivates", "tested_by", "produces", "supports", "weakens", "contradicts", "supports_gap", "weakens_gap", "substantiates"]},
+          "relation": {"enum": ["identifies", "motivates", "tested_by", "produces", "supports", "weakens", "contradicts", "supports_gap", "weakens_gap", "substantiates", "same_problem", "same_method_family", "extends_method", "replaces_component", "shares_assumption", "relaxes_assumption", "same_evaluation", "contradicts_result", "addresses_limitation", "exposes_failure", "counterevidence", "boundary_case"]},
           "to": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
           "provenance_refs": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"}, "uniqueItems": true},
           "status": {"enum": ["active", "stale", "superseded"]},

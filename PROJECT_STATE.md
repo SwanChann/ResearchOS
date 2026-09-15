@@ -1,12 +1,12 @@
 # Project State
 
-- last_verified: 2026-09-05 Asia/Shanghai
+- last_verified: 2026-09-15 Asia/Shanghai
 - durable_goal: Deliver and operate a local-first personal ResearchFlow that supports multiple research topics from evidence retrieval and literature synthesis through hypotheses, experiments, runs, decisions, cross-session continuation, and tested recovery.
 - success_criteria: A researcher can initialize or resume a topic, preserve evidence/provenance, distinguish verification and human review from scientific claims, execute bounded approved experiments, rebuild navigation, and recover durable records without requiring a cloud service.
-- active_workstream: researchflow/system-durability-and-contract-hardening
-- current_milestone: ResearchFlow V0.6.0 fully implements the locally scoped RFC-0001 CorpusGap + EvidenceGraph contract; adoption/migration of each real research project remains a separate authorization boundary.
-- current_task: Corpus freeze/extraction review, deterministic human-gated Gap derivation, exact Claim evidence, L1/L2/L3 graph review, export, snapshot-backed exact-reference migration, rollback, CLI, status/doctor/Knowledge projections, packaging, documentation, and adversarial tests are implemented, locally verified, and committed on `main`; no real project was migrated.
-- status: verified
+- active_workstream: researchflow/paper-adjacency
+- current_milestone: ResearchFlow V0.7.0 PaperAdjacency is implemented, verified, and human-accepted; establish its authorized local Git checkpoint, then run the authorized read-only `embodied-nav` preflight and adjacency dry-run.
+- current_task: Finalize the V0.7.0 local checkpoint and measure whether the accepted `embodied-nav` Corpus/extractions can generate structural adjacency candidates without writing that project.
+- status: in_progress
 
 ## Milestones
 
@@ -23,9 +23,14 @@
 11. [verified] Windows direct-CLI repair: install `C:\Users\Modes\bin\rf.cmd` on the user PATH, pin it to the ResearchOS V0.5.0 virtual environment with explicit UTF-8 settings, and make Git text decoding explicit in code. All 110 CLI help nodes, 82 tests, and 20 safe read-only commands across `embodied-nav` and `mllm_overthinking` pass.
 12. [verified/design-only] RFC-0001 source-level design review: SGHA public implementation and tests, EviGraph paper source/pseudocode, and ABE-Ralph public audit modules were inspected; a proposed CorpusGap + EvidenceGraph contract now covers schemas, CLI, migration, staleness, evidence gates, and acceptance tests. No module implementation or real-project migration has occurred.
 13. [verified] RFC-0001 complete local implementation: ResearchFlow 0.6.0 now has frozen `CORPUS-*`, locator-bound and human-reviewed extractions, deterministic `CGAPRUN-*`, human-only `GAP-*` approval, Gap-provenance Hypotheses, strict `PROB-*`/`CLAIM-*`, L1/L2/L3 `EGAUDIT-*`, typed fingerprint-bound edges, derived DOT/JSON export, exact-reference-only snapshot-backed migration, rollback, CLI/scaffold/preflight routes, status/doctor/Knowledge integration, and editable/wheel packaging.
+14. [verified] RFC-0002 PaperAdjacency: the V0.7.0 local implementation, 12-relation ontology, schemas, CLI, status/doctor integration, deterministic structural candidates, provider-neutral semantic import, human-only acceptance, staleness propagation, EvidenceGraph promotion, adjacency-aware Gap detection, documentation, packaging, and adversarial tests are verified and human-accepted.
 
 ## Verified Facts
 
+- Repository verification on 2026-09-15: `F:\codespace\ResearchOS`, branch `main`, baseline HEAD `f5ccb32d8dd9ef5003c2c8fb140456576d3f3e3b`. V0.7.0 changes are intentionally uncommitted and the worktree is dirty only with this implementation set; no real ResearchFlow project, Zotero library, SSH host, GPU, or robot was touched.
+- The full V0.7.0 suite contains 110 tests and passes. It covers deterministic/idempotent adjacency generation, manual/Agent import preflight, human-only acceptance, Paper and extraction staleness, neighbor/explanation queries, workspace-bounded export, EvidenceGraph promotion, and Gap creation/closure as the accepted adjacency set changes. `compileall`, all JSON Schema parses, and `git diff --check` pass.
+- `researchflow-0.7.0-py3-none-any.whl` was built with SHA-256 `6b07399b53cf4e11437a9bf942d62e418836d52db325636a3a4fbfe7dbe9d404`. A clean temporary environment outside the checkout loads version 0.7.0, finds the installed PaperAdjacency schema, and exposes all ten adjacency subcommands.
+- Deterministic generation uses only current human-accepted Corpus extraction tuples and makes no network/model call. It emits review-pending structural candidates for shared problem/method/assumption/evaluation and explicit `fails_under` evidence. Semantic relations remain provider-neutral imports and cannot influence Gap reasoning until a current `human:*` review accepts them.
 - Repository: `F:\codespace\ResearchOS`; branch `main`; implementation baseline was `3b4563f37c820260175caa5bb62903f45a0b14e4`. The V0.6.0 release checkpoint on current `main` includes RFC-0001 plus the preserved Windows Git-decoding repair; the worktree was clean at final verification. No push or merge is implied.
 - The full suite contains 103 tests and passes. Focused suites cover metric alias/tolerance, supersession, deterministic CorpusGap, human gates, semantic/fidelity review import, counterevidence, unrelated-edge isolation, dry-run, snapshot verification failure, injected rollback, migration idempotency, and restored graph equivalence. `compileall` passes.
 - CLI grammar audit traverses 146 root/group/leaf parser nodes and every `--help` invocation returns exit 0. `git diff --check` passes; Windows reports expected LF→CRLF checkout warnings but no whitespace errors.
@@ -47,6 +52,9 @@
 
 ## Decisions
 
+- Paper adjacency is a separate `PADJ-*` authority ledger rather than an inferred cache. Structural or semantic generation creates candidates only; acceptance is human-only and bound to the exact Paper analyses, Corpus/extractions, edge content, and review fingerprint.
+- Accepted current `PADJ-*` records may be explicitly promoted to EvidenceGraph and may drive presence/absence-based Gap motifs. Any change in the accepted adjacency set stales prior adjacency-aware Gap candidates rather than silently preserving the old conclusion.
+- V0.7.0 does not silently choose or call an embedding/LLM provider. Built-in semantic extraction/retrieval, paid calls, downloads, and permanent vector storage require a separate architectural decision.
 - Local project files remain authoritative. Git history, workspace snapshots, private remotes, Zotero backup, and large-asset backup are separate durability layers.
 - New matrices default to a generic cross-domain template. Domain/custom axes require an explicit user selection/confirmation and cannot be silently reinterpreted after data entry.
 - `status: verified` remains readable for compatibility, but current output separates contract/source/fingerprint/human-review/reproduction/scientific-claim meanings.
@@ -58,6 +66,9 @@
 
 ## Risks And Unknowns
 
+- Structural tuple-key equality can miss synonyms and can over-connect a method mentioned only as a comparison; it is an explainable recall heuristic, not semantic adjudication. Real-Corpus precision/recall has not yet been measured.
+- The 12-relation ontology and adjacency-aware Gap motifs are software-verified but not yet human-accepted on a real research field. A provider choice is also unresolved for semantic neighbors such as extension, contradiction, counterevidence, and boundary cases.
+- The V0.7.0 checkpoint is local only. The wheel smoke test proves package/install behavior, but the generated wheel lives in a temporary directory and is not an off-machine release artifact.
 - Snapshot/restore is now verified on temporary fixtures and the real `embodied-nav` workspace. `mllm_overthinking` still has no independently stored snapshot or recovery drill.
 - Existing real projects have legacy matrices and manually maintained KNOWLEDGE files. V0.5.0 correctly reports their generated navigation as missing/stale, but actual rebuild or schema migration remains unverified and unauthorized.
 - Zotero failure classification is mock-tested. No real Zotero Desktop diagnostic was run in this task, and the UI guidance was not refreshed through external web retrieval because external search was outside authorization.
@@ -68,4 +79,4 @@
 
 ## Next Step And User Decision
 
-- Unique priority after the local V0.6.0 checkpoint: select one real project for a separately authorized, dry-run-first adoption plan. That authorization must name the project and whether it permits only a migration preview or also a verified snapshot-backed apply; no such real-project action is implied by the software release.
+- Authorized next action: create the local V0.7.0 Git checkpoint, then recover `embodied-nav` from persistent state and run read-only project/Corpus/extraction checks plus `adjacency build --dry-run`. Do not create `PADJ-*` records or choose/call a semantic provider until the dry-run result is reported for review.

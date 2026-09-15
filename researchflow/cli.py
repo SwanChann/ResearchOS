@@ -268,6 +268,40 @@ def parser() -> argparse.ArgumentParser:
     gap_review.add_argument("--reviewer", required=True)
     gap_review.add_argument("--rationale-file", required=True, type=Path)
     gap_review.add_argument("--dry-run", action="store_true")
+    adjacency = evidence_actions.add_parser("adjacency", help="build and review evidence-bound PAPER-to-PAPER relationships")
+    adjacency_actions = adjacency.add_subparsers(dest="action", required=True)
+    adjacency_build = adjacency_actions.add_parser("build", help="derive deterministic candidates from accepted Corpus extractions")
+    adjacency_build.add_argument("--corpus", required=True)
+    adjacency_build.add_argument("--dry-run", action="store_true")
+    adjacency_add = adjacency_actions.add_parser("add", help="import an evidence-bound manual or agent-proposed adjacency")
+    adjacency_add.add_argument("request", type=Path)
+    adjacency_add.add_argument("--dry-run", action="store_true")
+    adjacency_list = adjacency_actions.add_parser("list")
+    adjacency_list.add_argument("--status", choices=("candidate", "accepted", "revision_requested", "rejected"))
+    adjacency_list.add_argument("--corpus")
+    adjacency_show = adjacency_actions.add_parser("show")
+    adjacency_show.add_argument("id")
+    adjacency_neighbors = adjacency_actions.add_parser("neighbors")
+    adjacency_neighbors.add_argument("paper_id")
+    adjacency_neighbors.add_argument("--status", choices=("candidate", "accepted", "revision_requested", "rejected", "all"), default="accepted")
+    adjacency_neighbors.add_argument("--top-k", type=int, default=10)
+    adjacency_explain = adjacency_actions.add_parser("explain")
+    adjacency_explain.add_argument("source")
+    adjacency_explain.add_argument("target")
+    adjacency_review = adjacency_actions.add_parser("review")
+    adjacency_review.add_argument("id")
+    adjacency_review.add_argument("--decision", choices=("accepted", "revision_requested", "rejected"), required=True)
+    adjacency_review.add_argument("--reviewer", required=True)
+    adjacency_review.add_argument("--rationale-file", required=True, type=Path)
+    adjacency_review.add_argument("--dry-run", action="store_true")
+    adjacency_actions.add_parser("check")
+    adjacency_export = adjacency_actions.add_parser("export")
+    adjacency_export.add_argument("--output", required=True, type=Path)
+    adjacency_export.add_argument("--format", choices=("dot", "json"), default="json")
+    adjacency_export.add_argument("--dry-run", action="store_true")
+    adjacency_promote = adjacency_actions.add_parser("promote", help="copy one accepted adjacency into EvidenceGraph with PADJ provenance")
+    adjacency_promote.add_argument("id")
+    adjacency_promote.add_argument("--dry-run", action="store_true")
     graph = evidence_actions.add_parser("graph", help="manage the rebuildable project EvidenceGraph")
     graph_actions = graph.add_subparsers(dest="action", required=True)
     graph_connect = graph_actions.add_parser("connect", help="add one typed, fingerprint-bound relationship")
@@ -409,10 +443,15 @@ def parser() -> argparse.ArgumentParser:
     scaffold_graph_review = scaffold_actions.add_parser("graph-review")
     scaffold_graph_review.add_argument("--claim", required=True)
     scaffold_graph_review.add_argument("--output", required=True, type=Path)
+    scaffold_adjacency = scaffold_actions.add_parser("paper-adjacency")
+    scaffold_adjacency.add_argument("--corpus", required=True)
+    scaffold_adjacency.add_argument("--from", required=True, dest="source")
+    scaffold_adjacency.add_argument("--to", required=True, dest="target")
+    scaffold_adjacency.add_argument("--output", required=True, type=Path)
 
     preflight = commands.add_parser("preflight", help="validate a draft before a formal atomic write")
     preflight.add_argument(
-        "kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact", "problem", "claim", "corpus-extraction", "graph-review")
+        "kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact", "problem", "claim", "corpus-extraction", "paper-adjacency", "graph-review")
     )
     preflight.add_argument("path", type=Path)
 
@@ -623,6 +662,35 @@ def execute(args: argparse.Namespace) -> int:
                     args.id, decision=args.decision, reviewer=args.reviewer,
                     rationale=rationale, dry_run=args.dry_run,
                 ))
+        elif args.evidence_kind == "adjacency":
+            from .adjacency import PaperAdjacencyStore
+            adjacency_store = PaperAdjacencyStore(project)
+            if args.action == "build":
+                dump(adjacency_store.build(args.corpus, dry_run=args.dry_run))
+            elif args.action == "add":
+                dump(adjacency_store.add_file(args.request, dry_run=args.dry_run))
+            elif args.action == "list":
+                dump(adjacency_store.list(status=args.status, corpus_id=args.corpus))
+            elif args.action == "show":
+                dump(adjacency_store.show(args.id))
+            elif args.action == "neighbors":
+                dump(adjacency_store.neighbors(args.paper_id, status=args.status, top_k=args.top_k))
+            elif args.action == "explain":
+                dump(adjacency_store.explain(args.source, args.target))
+            elif args.action == "review":
+                rationale = args.rationale_file.expanduser().resolve().read_text(encoding="utf-8")
+                dump(adjacency_store.review(
+                    args.id, decision=args.decision, reviewer=args.reviewer,
+                    rationale=rationale, dry_run=args.dry_run,
+                ))
+            elif args.action == "check":
+                result = adjacency_store.check()
+                dump(result)
+                return 0 if result["valid"] else 1
+            elif args.action == "promote":
+                dump(adjacency_store.promote(args.id, dry_run=args.dry_run))
+            else:
+                dump(adjacency_store.export(args.output, format=args.format, dry_run=args.dry_run))
         elif args.evidence_kind in {"problem", "claim"}:
             from .evidence_graph import ClaimStore, ProblemStore
             records = ProblemStore(project) if args.evidence_kind == "problem" else ClaimStore(project)
@@ -747,6 +815,9 @@ def execute(args: argparse.Namespace) -> int:
         elif args.scaffold_kind == "corpus-extraction":
             from .corpus_gap import CorpusStore
             print(CorpusStore(project).scaffold_extraction(args.corpus, args.paper, args.output))
+        elif args.scaffold_kind == "paper-adjacency":
+            from .scaffold import paper_adjacency_scaffold
+            print(paper_adjacency_scaffold(project, args.corpus, args.source, args.target, args.output))
         else:
             print(graph_review_scaffold(project, args.claim, args.output))
     elif args.root_command == "preflight":

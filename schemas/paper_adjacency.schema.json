@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+      "properties": {
+        "status": {"enum": ["pending", "accepted", "revision_requested", "rejected"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_fingerprint": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "rationale": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "corpus_id", "from", "relation", "to", "directed", "dimensions", "evidence", "rationale", "score", "generator", "source_fingerprints", "adjacency_fingerprint", "status", "review", "reviews", "created_at"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PADJ-[0-9]{6}$"},
+        "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+        "from": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "relation": {"enum": ["same_problem", "same_method_family", "extends_method", "replaces_component", "shares_assumption", "relaxes_assumption", "same_evaluation", "contradicts_result", "addresses_limitation", "exposes_failure", "counterevidence", "boundary_case"]},
+        "to": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "directed": {"type": "boolean"},
+        "dimensions": {"type": "array", "items": {"enum": ["problem", "method", "component", "assumption", "task", "dataset", "metric", "evaluation", "result", "limitation", "failure_condition", "boundary"]}, "minItems": 1, "uniqueItems": true},
+        "evidence": {"type": "array", "items": {"$ref": "paper_adjacency_request.schema.json#/$defs/evidence"}, "minItems": 2},
+        "rationale": {"type": "string", "minLength": 1},
+        "score": {"$ref": "paper_adjacency_request.schema.json#/$defs/score"},
+        "generator": {
+          "allOf": [
+            {"$ref": "paper_adjacency_request.schema.json#/$defs/generator"},
+            {"required": ["input_fingerprint"]}
+          ]
+        },
+        "source_fingerprints": {
+          "type": "object",
+          "minProperties": 2,
+          "maxProperties": 2,
+          "patternProperties": {"^PAPER-[0-9]{4}$": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"}},
+          "additionalProperties": false
+        },
+        "adjacency_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "status": {"enum": ["candidate", "accepted", "revision_requested", "rejected"]},
+        "review": {"$ref": "#/$defs/review"},
+        "reviews": {"type": "array", "items": {"$ref": "#/$defs/review"}},
+        "created_at": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "build": {
+      "type": "object",
+      "required": ["corpus_id", "corpus_fingerprint", "generator_version", "input_fingerprint", "edge_ids", "created_at"],
+      "properties": {
+        "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+        "corpus_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "generator_version": {"type": "string", "minLength": 1},
+        "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "edge_ids": {"type": "array", "items": {"type": "string", "pattern": "^PADJ-[0-9]{6}$"}, "uniqueItems": true},
+        "created_at": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "adjacency_id", "builds", "edges", "updated_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "adjacency_id": {"const": "project-paper-adjacency"},
+    "builds": {"type": "array", "items": {"$ref": "#/$defs/build"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

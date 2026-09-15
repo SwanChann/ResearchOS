@@ -15,6 +15,7 @@ from .schema import validate_record
 WORKSPACE_DIRS = (
     ".research",
     ".research/evidence-graph/audits", ".research/corpus-gap/runs", ".research/migrations",
+    ".research/paper-adjacency",
     "memory/observations", "memory/hypotheses", "memory/decisions",
     "memory/problems", "memory/gaps", "memory/claims",
     "evidence/papers/pdf", "evidence/papers/analysis",
@@ -270,6 +271,9 @@ class ResearchProject:
                 **__import__("researchflow.corpus_gap", fromlist=["CorpusStore"]).CorpusStore(self).summary(),
                 **__import__("researchflow.corpus_gap", fromlist=["GapStore"]).GapStore(self).summary(),
             },
+            "paper_adjacency": __import__(
+                "researchflow.adjacency", fromlist=["PaperAdjacencyStore"]
+            ).PaperAdjacencyStore(self).summary(),
         }
         if verbose:
             result["registry_entries"] = knowledge.inventory()

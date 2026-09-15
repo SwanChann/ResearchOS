@@ -19,6 +19,7 @@ rf evidence repo add|list|show|search
 rf evidence problem add|list|show
 rf evidence claim add|list|show
 rf evidence corpus create|list|show|verify|status|add-extraction|review-extraction
+rf evidence adjacency build|add|list|show|neighbors|explain|review|check|export|promote
 rf evidence gap detect|list|show|review
 rf evidence graph connect|rebuild|check|show|audit|review-input|review|export
 rf evidence search QUERY

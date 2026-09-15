@@ -34,7 +34,9 @@
         "cgap_run_id": {"type": "string", "pattern": "^CGAPRUN-[0-9]{6}$"},
         "motif_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
         "motif_version": {"type": "string", "minLength": 1},
-        "tuple_ids": {"type": "array", "items": {"type": "string", "pattern": "^TUPLE-[0-9a-f]{12}$"}, "minItems": 1, "uniqueItems": true}
+        "tuple_ids": {"type": "array", "items": {"type": "string", "pattern": "^TUPLE-[0-9a-f]{12}$"}, "uniqueItems": true},
+        "adjacency_ids": {"type": "array", "items": {"type": "string", "pattern": "^PADJ-[0-9]{6}$"}, "uniqueItems": true},
+        "adjacency_input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       },
       "additionalProperties": false
     },

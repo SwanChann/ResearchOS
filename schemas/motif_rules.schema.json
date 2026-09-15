@@ -22,6 +22,17 @@
         "algorithm": {"type": "string", "minLength": 1}
       },
       "additionalProperties": false
+    },
+    "adjacency_match": {
+      "type": "object",
+      "properties": {
+        "relation": {"enum": ["same_problem", "same_method_family", "extends_method", "replaces_component", "shares_assumption", "relaxes_assumption", "same_evaluation", "contradicts_result", "addresses_limitation", "exposes_failure", "counterevidence", "boundary_case"]},
+        "from": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "to": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+        "dimension": {"enum": ["problem", "method", "component", "assumption", "task", "dataset", "metric", "evaluation", "result", "limitation", "failure_condition", "boundary"]}
+      },
+      "additionalProperties": false,
+      "minProperties": 1
     }
   },
   "type": "object",
@@ -34,10 +45,14 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "motif", "problem_id", "title", "statement", "mechanism_missing", "remaining_scope", "boundary_conditions", "falsification", "tuple_match", "scores"],
+        "required": ["id", "motif", "problem_id", "title", "statement", "mechanism_missing", "remaining_scope", "boundary_conditions", "falsification", "scores"],
+        "anyOf": [
+          {"required": ["tuple_match"]},
+          {"required": ["adjacency_match"]}
+        ],
         "properties": {
           "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
-          "motif": {"enum": ["missing_edge", "assumption_failure", "evaluation_blind_spot", "contradictory_results", "dataset_method_mismatch"]},
+          "motif": {"enum": ["missing_edge", "assumption_failure", "evaluation_blind_spot", "contradictory_results", "dataset_method_mismatch", "adjacency_missing_relation", "adjacency_contradiction", "adjacency_boundary_gap"]},
           "problem_id": {"type": "string", "pattern": "^PROB-[0-9]{4}$"},
           "title": {"type": "string", "minLength": 1},
           "statement": {"type": "string", "minLength": 1},
@@ -48,6 +63,8 @@
           "tuple_match": {"$ref": "#/$defs/match"},
           "absence_match": {"$ref": "#/$defs/match"},
           "contradiction_match": {"$ref": "#/$defs/match"},
+          "adjacency_match": {"$ref": "#/$defs/adjacency_match"},
+          "adjacency_absence_match": {"$ref": "#/$defs/adjacency_match"},
           "known_counterevidence": {
             "type": "array",
             "items": {

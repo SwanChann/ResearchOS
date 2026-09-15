@@ -232,6 +232,26 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
         except ResearchFlowError as exc:
             checks.append(Check(f"project {candidate} corpus gap", False, str(exc)))
         try:
+            from .adjacency import PaperAdjacencyStore
+            adjacency = PaperAdjacencyStore(project).check()
+            if not adjacency["initialized"]:
+                checks.append(Check(
+                    f"project {candidate} paper adjacency", True,
+                    "not initialized; build from a fully accepted Corpus when needed", "warning",
+                ))
+            else:
+                detail = (
+                    f"{adjacency['edges']} edge(s), {adjacency['accepted_current']} current accepted; "
+                    f"{adjacency['builds']} deterministic build(s)"
+                )
+                checks.append(Check(
+                    f"project {candidate} paper adjacency", adjacency["valid"],
+                    detail if adjacency["valid"] else "; ".join(adjacency["issues"]),
+                    "pass" if adjacency["valid"] else "fail",
+                ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} paper adjacency", False, str(exc)))
+        try:
             from .evidence_graph import EvidenceGraphStore
             graph = EvidenceGraphStore(project).check()
             if not graph["initialized"]:

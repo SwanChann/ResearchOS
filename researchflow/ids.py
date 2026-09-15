@@ -21,6 +21,7 @@ ID_WIDTHS = {
     "CLAIM": 4,
     "CGAPRUN": 6,
     "EGAUDIT": 6,
+    "PADJ": 6,
 }
 
 

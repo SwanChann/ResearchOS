@@ -28,7 +28,8 @@ RFC-0001 adds two gated paths:
 ```text
 Problem record
 verified Matrix -> frozen Corpus -> locator-bound extraction -> human acceptance
-                -> deterministic candidate Gap -> human approval -> Hypothesis
+                -> PaperAdjacency candidates -> human acceptance
+                -> adjacency/tuple-aware candidate Gap -> human approval -> Hypothesis
 HYP -[tested_by]-> EXP -[produces]-> experimental_result OBS -[supports]-> CLAIM
                                exact RUN + Artifact hash + JSON Pointer value
 ```

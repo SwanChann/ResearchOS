@@ -24,6 +24,7 @@ TUPLE_RELATIONS = {
 MOTIFS = {
     "missing_edge", "assumption_failure", "evaluation_blind_spot",
     "contradictory_results", "dataset_method_mismatch",
+    "adjacency_missing_relation", "adjacency_contradiction", "adjacency_boundary_gap",
 }
 
 
@@ -408,11 +409,24 @@ class GapStore:
             raise ResearchFlowError(f"Gap ID does not match path: {gap_id}")
         current = gap_fingerprint(record)
         body_current = body.strip() == self._body(record).strip()
-        content_current = current == record["candidate_fingerprint"] and body_current
+        adjacency_current = True
+        adjacency_input = record.get("derivation", {}).get("adjacency_input_fingerprint")
+        if adjacency_input:
+            from .adjacency import PaperAdjacencyStore
+            accepted = [
+                item for item in PaperAdjacencyStore(self.project).list(
+                    status="accepted", corpus_id=record["derivation"]["corpus_id"]
+                ) if item["current"]
+            ]
+            adjacency_current = adjacency_input == canonical_hash(sorted(
+                item["adjacency_fingerprint"] for item in accepted
+            ))
+        content_current = current == record["candidate_fingerprint"] and body_current and adjacency_current
         review_current = record["review"]["reviewed_fingerprint"] in {None, current}
         return {
             "record": record, "body": body, "fingerprint": current,
             "content_current": content_current, "body_current": body_current,
+            "adjacency_current": adjacency_current,
             "review_current": review_current,
             "approved": record["state"] == "approved" and record["review"]["status"] == "approved" and review_current and content_current,
         }
@@ -425,6 +439,17 @@ class GapStore:
             "object_key": item["object"]["key"],
         }
         return all(mapping[key] == value for key, value in predicate.items())
+
+    @staticmethod
+    def _adjacency_matches(item: dict[str, Any], predicate: dict[str, Any]) -> bool:
+        mapping = {"relation": item["relation"], "from": item["from"], "to": item["to"]}
+        for key, value in predicate.items():
+            if key == "dimension":
+                if value not in item["dimensions"]:
+                    return False
+            elif mapping[key] != value:
+                return False
+        return True
 
     def _accepted_tuples(self, corpus_id: str) -> tuple[list[dict[str, Any]], list[str]]:
         status = self.corpora.extraction_status(corpus_id)
@@ -440,10 +465,14 @@ class GapStore:
         return sorted(tuples, key=lambda item: item["id"]), sorted(fingerprints)
 
     def _candidate_for_rule(
-        self, corpus: dict[str, Any], rule: dict[str, Any], version: str, tuples: list[dict[str, Any]], run_id: str,
+        self, corpus: dict[str, Any], rule: dict[str, Any], version: str, tuples: list[dict[str, Any]],
+        adjacencies: list[dict[str, Any]], run_id: str,
     ) -> dict[str, Any] | None:
-        matched = [item for item in tuples if self._matches(item, rule["tuple_match"])]
-        if not matched:
+        matched = [item for item in tuples if self._matches(item, rule["tuple_match"])] if rule.get("tuple_match") else []
+        matched_adjacencies = [
+            item for item in adjacencies if self._adjacency_matches(item, rule["adjacency_match"])
+        ] if rule.get("adjacency_match") else []
+        if not matched and not matched_adjacencies:
             return None
         if rule["motif"] == "missing_edge":
             if "absence_match" not in rule:
@@ -457,6 +486,11 @@ class GapStore:
             if not contrad:
                 return None
             matched.extend(contrad)
+        if rule["motif"] in {"adjacency_missing_relation", "adjacency_boundary_gap"}:
+            if "adjacency_absence_match" not in rule:
+                raise ResearchFlowError(f"{rule['motif']} rule {rule['id']} requires adjacency_absence_match.")
+            if any(self._adjacency_matches(item, rule["adjacency_absence_match"]) for item in adjacencies):
+                return None
         from .evidence_graph import RecordResolver
         problem = RecordResolver(self.project).resolve(rule["problem_id"])
         if problem["kind"] != "PROB":
@@ -469,7 +503,12 @@ class GapStore:
             "corpus_id": corpus["id"], "corpus_fingerprint": corpus["corpus_fingerprint"],
             "cgap_run_id": run_id, "motif_id": rule["id"], "motif_version": version,
             "tuple_ids": sorted({item["id"] for item in matched}),
+            "adjacency_ids": sorted({item["id"] for item in matched_adjacencies}),
         }
+        if rule.get("adjacency_match") or rule.get("adjacency_absence_match"):
+            derivation["adjacency_input_fingerprint"] = canonical_hash(sorted(
+                item["adjacency_fingerprint"] for item in adjacencies
+            ))
         candidate = {
             "title": rule["title"], "problem_id": rule["problem_id"], "statement": rule["statement"],
             "mechanism_missing": rule["mechanism_missing"], "remaining_scope": rule["remaining_scope"],
@@ -493,9 +532,15 @@ class GapStore:
         if len({item["id"] for item in rules["rules"]}) != len(rules["rules"]):
             raise ResearchFlowError("Motif rule IDs must be unique.")
         tuples, extraction_fingerprints = self._accepted_tuples(corpus_id)
+        from .adjacency import PaperAdjacencyStore
+        adjacencies = [
+            item for item in PaperAdjacencyStore(self.project).list(status="accepted", corpus_id=corpus_id)
+            if item["current"]
+        ]
+        adjacency_fingerprints = sorted(item["adjacency_fingerprint"] for item in adjacencies)
         input_fingerprint = canonical_hash({
             "corpus": corpus["corpus_fingerprint"], "extractions": extraction_fingerprints,
-            "motifs": rules, "test_only": test_only,
+            "adjacencies": adjacency_fingerprints, "motifs": rules, "test_only": test_only,
         })
         for manifest_path in sorted(self.run_root.glob("CGAPRUN-*/manifest.yaml")):
             manifest = read_yaml(manifest_path)
@@ -504,7 +549,7 @@ class GapStore:
         preview_run = "CGAPRUN-000000"
         preview = [
             candidate for rule in rules["rules"]
-            if (candidate := self._candidate_for_rule(corpus, rule, rules["version"], tuples, preview_run)) is not None
+            if (candidate := self._candidate_for_rule(corpus, rule, rules["version"], tuples, adjacencies, preview_run)) is not None
         ]
         if dry_run:
             return {
@@ -519,17 +564,24 @@ class GapStore:
                 if manifest.get("input_fingerprint") == input_fingerprint:
                     return {**manifest, "created": False, "idempotent": True, "dry_run": False}
             current_tuples, current_extraction_fingerprints = self._accepted_tuples(corpus_id)
+            current_adjacencies = [
+                item for item in PaperAdjacencyStore(self.project).list(status="accepted", corpus_id=corpus_id)
+                if item["current"]
+            ]
+            current_adjacency_fingerprints = sorted(item["adjacency_fingerprint"] for item in current_adjacencies)
             current_input = canonical_hash({
                 "corpus": corpus["corpus_fingerprint"], "extractions": current_extraction_fingerprints,
-                "motifs": rules, "test_only": test_only,
+                "adjacencies": current_adjacency_fingerprints, "motifs": rules, "test_only": test_only,
             })
             if current_input != input_fingerprint:
                 raise ResearchFlowError("Corpus extraction inputs changed during Gap detection; rerun the command.")
             tuples = current_tuples
+            adjacencies = current_adjacencies
+            adjacency_fingerprints = current_adjacency_fingerprints
             run_id = allocate_id(research_home(), "CGAPRUN")
             candidates = [
                 candidate for rule in rules["rules"]
-                if (candidate := self._candidate_for_rule(corpus, rule, rules["version"], tuples, run_id)) is not None
+                if (candidate := self._candidate_for_rule(corpus, rule, rules["version"], tuples, adjacencies, run_id)) is not None
             ]
             existing = {item["candidate_fingerprint"]: item for item in self.list()}
             run_folder = self.run_root / run_id
@@ -556,6 +608,7 @@ class GapStore:
                     "corpus_fingerprint": corpus["corpus_fingerprint"], "motif_version": rules["version"],
                     "input_fingerprint": input_fingerprint, "candidate_gaps": created_gaps,
                     "created_at": utc_now(), "test_only": test_only,
+                    "adjacency_fingerprints": adjacency_fingerprints,
                 }
                 validate_record("corpus_gap_run", manifest)
                 write_yaml(run_folder / "manifest.yaml", manifest)
@@ -567,6 +620,7 @@ class GapStore:
                 atomic_text(run_folder / "audit.jsonl", json.dumps({
                     "event": "deterministic_gap_detection", "input_fingerprint": input_fingerprint,
                     "rules": len(rules["rules"]), "tuples": len(tuples), "candidates": len(candidates),
+                    "accepted_adjacencies": len(adjacencies),
                     "test_only": test_only,
                     "meaning": "Heuristic candidates require human review and do not establish an open research gap.",
                 }, ensure_ascii=False, sort_keys=True) + "\n")
