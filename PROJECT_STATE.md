@@ -4,9 +4,9 @@
 - durable_goal: Deliver and operate a local-first personal ResearchFlow that supports multiple research topics from evidence retrieval and literature synthesis through hypotheses, experiments, runs, decisions, cross-session continuation, and tested recovery.
 - success_criteria: A researcher can initialize or resume a topic, preserve evidence/provenance, distinguish verification and human review from scientific claims, execute bounded approved experiments, rebuild navigation, and recover durable records without requiring a cloud service.
 - active_workstream: researchflow/paper-adjacency
-- current_milestone: ResearchFlow V0.7.0 PaperAdjacency is implemented, verified, and human-accepted; establish its authorized local Git checkpoint, then run the authorized read-only `embodied-nav` preflight and adjacency dry-run.
-- current_task: Finalize the V0.7.0 local checkpoint and measure whether the accepted `embodied-nav` Corpus/extractions can generate structural adjacency candidates without writing that project.
-- status: in_progress
+- current_milestone: ResearchFlow V0.8.0 Extraction V2, concept normalization, semantic adjacency, comparison packets, benchmark evaluation, and its authorized local Git checkpoint are complete; the authorized `CORPUS-0007` read-only comparison is also complete.
+- current_task: Preserve the verified V0.8.0 implementation as the local checkpoint while keeping all `embodied-nav` V2 writes behind a separate future authorization.
+- status: verified
 
 ## Milestones
 
@@ -24,13 +24,15 @@
 12. [verified/design-only] RFC-0001 source-level design review: SGHA public implementation and tests, EviGraph paper source/pseudocode, and ABE-Ralph public audit modules were inspected; a proposed CorpusGap + EvidenceGraph contract now covers schemas, CLI, migration, staleness, evidence gates, and acceptance tests. No module implementation or real-project migration has occurred.
 13. [verified] RFC-0001 complete local implementation: ResearchFlow 0.6.0 now has frozen `CORPUS-*`, locator-bound and human-reviewed extractions, deterministic `CGAPRUN-*`, human-only `GAP-*` approval, Gap-provenance Hypotheses, strict `PROB-*`/`CLAIM-*`, L1/L2/L3 `EGAUDIT-*`, typed fingerprint-bound edges, derived DOT/JSON export, exact-reference-only snapshot-backed migration, rollback, CLI/scaffold/preflight routes, status/doctor/Knowledge integration, and editable/wheel packaging.
 14. [verified] RFC-0002 PaperAdjacency: the V0.7.0 local implementation, 12-relation ontology, schemas, CLI, status/doctor integration, deterministic structural candidates, provider-neutral semantic import, human-only acceptance, staleness propagation, EvidenceGraph promotion, adjacency-aware Gap detection, documentation, packaging, and adversarial tests are verified and human-accepted.
+15. [verified] ResearchFlow V0.8.0: Extraction V2 coverage, human-reviewed concept normalization, deterministic semantic candidates, read-only comparison packets, fingerprint-bound human benchmark evaluation, CLI/status/doctor integration, backward compatibility, documentation, isolated wheel install, and the user-authorized local Git checkpoint are complete. No real-project write or push was performed.
 
 ## Verified Facts
 
-- Repository verification on 2026-09-15: `F:\codespace\ResearchOS`, branch `main`, baseline HEAD `f5ccb32d8dd9ef5003c2c8fb140456576d3f3e3b`. V0.7.0 changes are intentionally uncommitted and the worktree is dirty only with this implementation set; no real ResearchFlow project, Zotero library, SSH host, GPU, or robot was touched.
-- The full V0.7.0 suite contains 110 tests and passes. It covers deterministic/idempotent adjacency generation, manual/Agent import preflight, human-only acceptance, Paper and extraction staleness, neighbor/explanation queries, workspace-bounded export, EvidenceGraph promotion, and Gap creation/closure as the accepted adjacency set changes. `compileall`, all JSON Schema parses, and `git diff --check` pass.
-- `researchflow-0.7.0-py3-none-any.whl` was built with SHA-256 `6b07399b53cf4e11437a9bf942d62e418836d52db325636a3a4fbfe7dbe9d404`. A clean temporary environment outside the checkout loads version 0.7.0, finds the installed PaperAdjacency schema, and exposes all ten adjacency subcommands.
-- Deterministic generation uses only current human-accepted Corpus extraction tuples and makes no network/model call. It emits review-pending structural candidates for shared problem/method/assumption/evaluation and explicit `fails_under` evidence. Semantic relations remain provider-neutral imports and cannot influence Gap reasoning until a current `human:*` review accepts them.
+- Repository verification on 2026-09-15: `F:\codespace\ResearchOS`, branch `main`; V0.8.0 is preserved by the user-authorized local checkpoint containing this ledger, implementation, schemas, tests, RFC, and documentation. Its parent `1f6cb7e088466d2d03a914ad5ef8e2676640bf69` remains the verified V0.7.0 checkpoint. No push or merge was performed.
+- The full V0.8.0 suite contains 112 tests and passes. Focused tests cover V1 scaffold compatibility, V2 coverage consistency, concept human/parent gates, semantic relations, comparison packets, and fingerprint-stale benchmarks. `compileall`, all JSON Schemas, and `git diff --check` pass.
+- Temporary wheel `researchflow-0.8.0-py3-none-any.whl` has SHA-256 `42178ac2a02dc5dc4d8dfab78ac3777a158127d782f191f22f40e043c9d56b27`. A clean temporary environment outside the checkout loads 0.8.0, finds the V2/concept/benchmark schemas, and exposes all 16 adjacency subcommands.
+- The authorized read-only `CORPUS-0007` comparison confirms 27 current human-accepted schema-V1 extractions. Structural and semantic dry-runs both emit the same 10 candidates (6 `same_problem`, 4 `shares_assumption`) because the real project has no accepted concept vocabulary and no V2 semantic tuples. The read-only lexical packet additionally surfaces comparison leads such as PAPER-0005/PAPER-0014, PAPER-0011/PAPER-0030, PAPER-0012/PAPER-0017, and continuous-VLN/VLN-R1 pairs; these are recall proposals, not accepted relationships.
+- The real-project comparison left both `.research/paper-adjacency/edges.yaml` and `.research/paper-adjacency/concepts.yaml` absent before and after. No `embodied-nav` record, Zotero library, SSH host, GPU, robot, or independent research-repo file was changed.
 - Repository: `F:\codespace\ResearchOS`; branch `main`; implementation baseline was `3b4563f37c820260175caa5bb62903f45a0b14e4`. The V0.6.0 release checkpoint on current `main` includes RFC-0001 plus the preserved Windows Git-decoding repair; the worktree was clean at final verification. No push or merge is implied.
 - The full suite contains 103 tests and passes. Focused suites cover metric alias/tolerance, supersession, deterministic CorpusGap, human gates, semantic/fidelity review import, counterevidence, unrelated-edge isolation, dry-run, snapshot verification failure, injected rollback, migration idempotency, and restored graph equivalence. `compileall` passes.
 - CLI grammar audit traverses 146 root/group/leaf parser nodes and every `--help` invocation returns exit 0. `git diff --check` passes; Windows reports expected LF→CRLF checkout warnings but no whitespace errors.
@@ -66,8 +68,8 @@
 
 ## Risks And Unknowns
 
-- Structural tuple-key equality can miss synonyms and can over-connect a method mentioned only as a comparison; it is an explainable recall heuristic, not semantic adjudication. Real-Corpus precision/recall has not yet been measured.
-- The 12-relation ontology and adjacency-aware Gap motifs are software-verified but not yet human-accepted on a real research field. A provider choice is also unresolved for semantic neighbors such as extension, contradiction, counterevidence, and boundary cases.
+- The real Corpus remains schema V1 and has no accepted concept vocabulary, so deterministic semantic generation cannot improve the 10 exact-key structural edges yet. V0.8 capability is software-verified; real-field precision/recall remains unmeasured because no human benchmark exists for `CORPUS-0007`.
+- Lexical packet ranking raises recall but may over-rank generic shared task words or coincidental token overlap. Every proposed pair still requires source-level comparison and a human relation label before it can become `PADJ-*` evidence.
 - The V0.7.0 checkpoint is local only. The wheel smoke test proves package/install behavior, but the generated wheel lives in a temporary directory and is not an off-machine release artifact.
 - Snapshot/restore is now verified on temporary fixtures and the real `embodied-nav` workspace. `mllm_overthinking` still has no independently stored snapshot or recovery drill.
 - Existing real projects have legacy matrices and manually maintained KNOWLEDGE files. V0.5.0 correctly reports their generated navigation as missing/stale, but actual rebuild or schema migration remains unverified and unauthorized.
@@ -79,4 +81,4 @@
 
 ## Next Step And User Decision
 
-- Authorized next action: create the local V0.7.0 Git checkpoint, then recover `embodied-nav` from persistent state and run read-only project/Corpus/extraction checks plus `adjacency build --dry-run`. Do not create `PADJ-*` records or choose/call a semantic provider until the dry-run result is reported for review.
+- Optional next decision: separately authorize either an isolated restored-copy pilot or real-project V2 adoption for named pairs such as PAPER-0011/PAPER-0030 and PAPER-0012/PAPER-0017. Until then, do not write `embodied-nav`.

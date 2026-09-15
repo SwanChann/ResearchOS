@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewer", "reviewed_fingerprint", "rationale", "reviewed_at"],
+      "properties": {
+        "status": {"enum": ["pending", "accepted", "revision_requested", "rejected"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_fingerprint": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "rationale": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "concept": {
+      "type": "object",
+      "required": ["id", "type", "canonical_key", "label", "aliases", "broader_key", "related_keys", "rationale", "source", "concept_fingerprint", "status", "review", "reviews", "created_at"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^CONCEPT-[0-9]{6}$"},
+        "type": {"enum": ["Problem", "Method", "Component", "Task", "Dataset", "Metric", "Assumption", "Result", "Limitation", "FailureCondition", "TrainingSignal", "Feedback", "Embodiment"]},
+        "canonical_key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "aliases": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$"}, "uniqueItems": true},
+        "broader_key": {"type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._/-]*$"},
+        "related_keys": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$"}, "uniqueItems": true},
+        "rationale": {"type": "string", "minLength": 1},
+        "source": {"$ref": "concept_request.schema.json#/properties/source"},
+        "concept_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "status": {"enum": ["candidate", "accepted", "revision_requested", "rejected"]},
+        "review": {"$ref": "#/$defs/review"},
+        "reviews": {"type": "array", "items": {"$ref": "#/$defs/review"}},
+        "created_at": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "vocabulary_id", "concepts", "updated_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "vocabulary_id": {"const": "project-paper-concepts"},
+    "concepts": {"type": "array", "items": {"$ref": "#/$defs/concept"}},
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

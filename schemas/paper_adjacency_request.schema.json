@@ -34,7 +34,7 @@
       "type": "object",
       "required": ["kind", "name", "version"],
       "properties": {
-        "kind": {"enum": ["deterministic_structural", "human", "agent_import", "tool_import"]},
+        "kind": {"enum": ["deterministic_structural", "deterministic_semantic", "human", "agent_import", "tool_import"]},
         "name": {"type": "string", "minLength": 1},
         "version": {"type": "string", "minLength": 1},
         "input_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
@@ -67,7 +67,17 @@
     "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}, "minItems": 2},
     "rationale": {"type": "string", "minLength": 1},
     "score": {"$ref": "#/$defs/score"},
-    "generator": {"$ref": "#/$defs/generator"}
+    "generator": {"$ref": "#/$defs/generator"},
+    "semantic_context": {
+      "type": "object",
+      "required": ["vocabulary_fingerprint", "algorithm"],
+      "properties": {
+        "vocabulary_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "packet_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "algorithm": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

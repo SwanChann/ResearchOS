@@ -44,7 +44,8 @@
         "status": {"enum": ["candidate", "accepted", "revision_requested", "rejected"]},
         "review": {"$ref": "#/$defs/review"},
         "reviews": {"type": "array", "items": {"$ref": "#/$defs/review"}},
-        "created_at": {"type": "string", "minLength": 1}
+        "created_at": {"type": "string", "minLength": 1},
+        "semantic_context": {"$ref": "paper_adjacency_request.schema.json#/properties/semantic_context"}
       },
       "additionalProperties": false
     },

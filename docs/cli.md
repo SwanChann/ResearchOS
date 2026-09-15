@@ -31,7 +31,8 @@ rf evidence problem list|show
 rf evidence claim add REQUEST.yaml [--dry-run]
 rf evidence claim list|show|supersede
 rf evidence corpus create|list|show|verify|status|add-extraction|review-extraction
-rf evidence adjacency build|add|list|show|neighbors|explain|review|check|export|promote
+rf evidence adjacency build|add|list|show|neighbors|explain|review|check|export|promote|packet|evaluate
+rf evidence adjacency concept-add|concept-list|concept-show|concept-review|concept-resolve|concept-check
 rf evidence gap detect --corpus ID --motifs FILE [--test-only] [--dry-run]
 rf evidence gap list|show|review
 rf evidence graph connect --from ID --relation RELATION --to ID [--provenance IDS] [--dry-run]
@@ -57,8 +58,8 @@ rf memory decision add|show
 rf artifact add|list|show|verify|refresh|supersede|migrate
 rf knowledge rebuild [--dry-run]
 rf knowledge check
-rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact|problem|claim|corpus-extraction|paper-adjacency|graph-review
-rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact|problem|claim|corpus-extraction|paper-adjacency|graph-review FILE
+rf scaffold paper-analysis|matrix-entry|synthesis-idea|artifact|problem|claim|corpus-extraction|corpus-extraction-v2|paper-concept|paper-adjacency|graph-review
+rf preflight paper-analysis|matrix-entry|matrix-synthesis|artifact|problem|claim|corpus-extraction|corpus-extraction-v2|paper-concept|paper-adjacency|graph-review FILE
 rf migrate paper-verification [--dry-run]
 rf migrate corpus-gap-evidence-graph --dry-run [--snapshot-dir DIR]
 rf migrate corpus-gap-evidence-graph --plan-fingerprint SHA256 [--snapshot-dir DIR]
@@ -87,7 +88,7 @@ Problem, Claim, extraction, and graph-review scaffolds are Agent-editable drafts
 
 Corpus creation freezes the selected matrix fingerprint and each included paper source fingerprint. Extraction acceptance and Gap approval are explicit human gates. Gap detection is deterministic for a fixed Corpus, accepted extraction set, motif version, and `test_only` flag. Migration only maps exact legacy references, creates no inferred Problem/Gap/Claim, requires the reviewed dry-run fingerprint, and verifies a snapshot before authority files change.
 
-Paper adjacency build accepts only a valid Corpus with current human-accepted extraction for every Paper. It creates deterministic candidates from shared Task, Method, Assumption, Dataset, Metric, and explicit failure structure. `neighbors` defaults to current accepted edges; `review --decision accepted` requires `human:*`. Manual/Agent semantic proposals use scaffold→preflight→add and must cite both Papers' Claim IDs and locators. `promote` explicitly creates a fingerprint-bound EvidenceGraph PAPER edge with PADJ provenance. Adjacency-aware Gap motifs consume only current accepted PADJ records.
+Paper adjacency build accepts only a valid Corpus with current human-accepted extraction for every Paper. Structural mode uses exact keys. Semantic mode additionally uses current human-accepted concept aliases/families and explicit semantic tuples; both modes only create candidates. `packet` produces a read-only ranked comparison queue, and `evaluate` measures a generator against a `human:*` benchmark without writing records. `neighbors` defaults to current accepted edges; `review --decision accepted` requires `human:*`. `promote` explicitly creates a fingerprint-bound EvidenceGraph PAPER edge with PADJ provenance. Adjacency-aware Gap motifs consume only current accepted PADJ records.
 
 Experiment and run commands:
 

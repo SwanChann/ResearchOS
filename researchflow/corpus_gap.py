@@ -14,12 +14,14 @@ from .schema import validate_record
 
 
 NODE_TYPES = {
-    "Paper", "Method", "Task", "Dataset", "Metric", "Assumption",
-    "Result", "Limitation", "FailureCondition",
+    "Paper", "Problem", "Method", "Component", "Task", "Dataset", "Metric", "Assumption",
+    "Result", "Limitation", "FailureCondition", "TrainingSignal", "Feedback", "Embodiment",
 }
 TUPLE_RELATIONS = {
     "proposes", "evaluated_on", "uses_dataset", "measured_by", "improves_over",
-    "fails_under", "assumes", "limited_by", "contradicts",
+    "fails_under", "assumes", "limited_by", "contradicts", "studies", "uses_component",
+    "trained_with", "uses_feedback", "reports_result", "extends", "replaces", "addresses",
+    "generalizes_to", "requires", "compared_with",
 }
 MOTIFS = {
     "missing_edge", "assumption_failure", "evaluation_blind_spot",
@@ -72,10 +74,51 @@ def corpus_fingerprint(scope: dict[str, Any], matrix_sha256: str, papers: list[d
 
 
 def extraction_fingerprint(record: dict[str, Any]) -> str:
-    return canonical_hash({
+    stable = {
         key: record[key]
         for key in ("corpus_id", "paper_id", "paper_fingerprint", "extractor", "tuples")
-    })
+    }
+    if record.get("schema_version") == 2:
+        stable["schema_version"] = 2
+        stable["coverage"] = record["coverage"]
+    return canonical_hash(stable)
+
+
+def validate_extraction_record(record: dict[str, Any]) -> None:
+    validate_record("corpus_extraction_v2" if record.get("schema_version") == 2 else "corpus_extraction", record)
+
+
+V2_COVERAGE_RULES: dict[str, dict[str, set[str]]] = {
+    "problem": {"relations": {"studies"}, "types": {"Problem"}},
+    "method_components": {"relations": {"proposes", "uses_component"}, "types": {"Method", "Component"}},
+    "training": {"relations": {"trained_with", "uses_feedback"}, "types": {"TrainingSignal", "Feedback"}},
+    "evaluation": {"relations": {"evaluated_on", "uses_dataset", "measured_by"}, "types": {"Task", "Dataset", "Metric"}},
+    "results": {"relations": {"reports_result", "improves_over", "contradicts"}, "types": {"Result"}},
+    "assumptions": {"relations": {"assumes", "requires"}, "types": {"Assumption"}},
+    "limitations": {"relations": {"limited_by"}, "types": {"Limitation"}},
+    "failure_conditions": {"relations": {"fails_under"}, "types": {"FailureCondition"}},
+    "prior_work_delta": {"relations": {"extends", "replaces", "addresses", "improves_over", "compared_with"}, "types": set()},
+}
+
+
+def validate_v2_coverage(record: dict[str, Any]) -> None:
+    tuples = record["tuples"]
+    for name, rule in V2_COVERAGE_RULES.items():
+        found = any(
+            item["relation"] in rule["relations"]
+            or item["subject"]["type"] in rule["types"]
+            or item["object"]["type"] in rule["types"]
+            for item in tuples
+        )
+        status = record["coverage"][name]["status"]
+        if status == "covered" and not found:
+            raise ResearchFlowError(
+                f"Extraction V2 marks coverage.{name} as covered but supplies no matching tuple."
+            )
+        if status != "covered" and found:
+            raise ResearchFlowError(
+                f"Extraction V2 marks coverage.{name} as {status} but supplies a matching tuple."
+            )
 
 
 def gap_fingerprint(record: dict[str, Any]) -> str:
@@ -222,7 +265,10 @@ class CorpusStore:
 
     def _normalize_extraction(self, request_file: Path) -> dict[str, Any]:
         request = read_yaml(request_file.expanduser().resolve())
-        validate_record("corpus_extraction_request", request)
+        is_v2 = request.get("schema_version") == 2
+        validate_record("corpus_extraction_v2_request" if is_v2 else "corpus_extraction_request", request)
+        if is_v2:
+            validate_v2_coverage(request)
         corpus = self.show(request["corpus_id"])["record"]
         paper = next((item for item in corpus["papers"] if item["id"] == request["paper_id"]), None)
         if not paper:
@@ -284,12 +330,13 @@ class CorpusStore:
                     return {"extraction": existing, "created": False, "idempotent": True, "dry_run": False}
                 raise ResearchFlowError(f"Extraction changed during import: {target}")
             record = {
-                "schema_version": 1, **normalized, "extraction_fingerprint": fingerprint,
+                "schema_version": normalized.get("schema_version", 1), **normalized,
+                "extraction_fingerprint": fingerprint,
                 "created_at": utc_now(),
                 "review": {"status": "pending", "reviewer": None, "reviewed_fingerprint": None, "rationale": None, "reviewed_at": None},
                 "reviews": [],
             }
-            validate_record("corpus_extraction", record)
+            validate_extraction_record(record)
             write_yaml(target, record)
             return {"extraction": record, "created": True, "idempotent": False, "dry_run": False}
 
@@ -308,7 +355,7 @@ class CorpusStore:
         target = self.extraction_root / corpus_id / f"{paper_id}.yaml"
         def prepare() -> tuple[dict[str, Any], dict[str, Any]]:
             record = read_yaml(target)
-            validate_record("corpus_extraction", record)
+            validate_extraction_record(record)
             current = extraction_fingerprint(record)
             if current != record["extraction_fingerprint"]:
                 raise ResearchFlowError("Extraction content changed; import a new Corpus/extraction instead of reviewing stale content.")
@@ -317,7 +364,7 @@ class CorpusStore:
                 "rationale": rationale.strip(), "reviewed_at": utc_now(),
             }
             candidate = {**record, "review": review, "reviews": [*record["reviews"], review]}
-            validate_record("corpus_extraction", candidate)
+            validate_extraction_record(candidate)
             return review, candidate
 
         if dry_run:
@@ -337,7 +384,7 @@ class CorpusStore:
                 values.append({"paper_id": paper["id"], "status": "missing", "current": False})
                 continue
             record = read_yaml(path)
-            validate_record("corpus_extraction", record)
+            validate_extraction_record(record)
             current = extraction_fingerprint(record) == record["extraction_fingerprint"]
             accepted = (
                 current and record["review"]["status"] == "accepted"
@@ -346,6 +393,7 @@ class CorpusStore:
             values.append({
                 "paper_id": paper["id"], "status": record["review"]["status"],
                 "current": current, "accepted": accepted,
+                "schema_version": record.get("schema_version", 1),
             })
         return {
             "corpus_id": corpus_id, "papers": len(corpus["papers"]), "extractions": values,
@@ -372,6 +420,38 @@ class CorpusStore:
                 },
                 "epistemic_status": "paper_reported",
             }],
+        }
+        target = output.expanduser().resolve()
+        atomic_text(target, __import__("yaml").safe_dump(request, sort_keys=False, allow_unicode=True))
+        return target
+
+    def scaffold_extraction_v2(self, corpus_id: str, paper_id: str, output: Path) -> Path:
+        corpus = self.show(corpus_id)["record"]
+        paper = next((item for item in corpus["papers"] if item["id"] == paper_id), None)
+        if not paper:
+            raise ResearchFlowError(f"{paper_id} is not in {corpus_id}.")
+        request = {
+            "schema_version": 2, "corpus_id": corpus_id, "paper_id": paper_id,
+            "paper_fingerprint": paper["source_fingerprint"],
+            "extractor": {"kind": "agent", "name": "DRAFT", "version": "extraction-v2"},
+            "coverage": {
+                name: {"status": "not_reported", "rationale": "DRAFT: inspect the verified Paper and classify this category."}
+                for name in V2_COVERAGE_RULES
+            },
+            "tuples": [{
+                "subject": {"type": "Paper", "key": paper_id.casefold()},
+                "relation": "proposes",
+                "object": {"type": "Method", "key": "draft/method", "label": "DRAFT method"},
+                "assertion": "DRAFT: state one source-bounded assertion.",
+                "evidence": {
+                    "paper_claim_ids": ["C01"], "locators": [{"kind": "page", "value": "1"}],
+                    "exact_text_sha256": "0" * 64,
+                },
+                "epistemic_status": "paper_reported",
+            }],
+        }
+        request["coverage"]["method_components"] = {
+            "status": "covered", "rationale": "DRAFT: the scaffold includes one placeholder method tuple."
         }
         target = output.expanduser().resolve()
         atomic_text(target, __import__("yaml").safe_dump(request, sort_keys=False, allow_unicode=True))

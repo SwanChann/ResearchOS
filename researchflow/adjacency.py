@@ -17,6 +17,7 @@ from .schema import validate_record
 ADJACENCY_RELATIVE_PATH = Path(".research/paper-adjacency/edges.yaml")
 LOCK_RELATIVE_PATH = Path(".locks/paper-adjacency-write.lock")
 GENERATOR_VERSION = "structural-v1"
+SEMANTIC_GENERATOR_VERSION = "semantic-v2"
 
 RELATIONS = {
     "same_problem", "same_method_family", "extends_method", "replaces_component",
@@ -28,13 +29,16 @@ SYMMETRIC_RELATIONS = {"same_problem", "same_method_family", "shares_assumption"
 
 
 def adjacency_fingerprint(edge: dict[str, Any]) -> str:
-    return canonical_hash({
+    stable = {
         key: edge[key]
         for key in (
             "corpus_id", "from", "relation", "to", "directed", "dimensions",
             "evidence", "rationale", "score", "generator", "source_fingerprints",
         )
-    })
+    }
+    if edge.get("semantic_context"):
+        stable["semantic_context"] = edge["semantic_context"]
+    return canonical_hash(stable)
 
 
 class PaperAdjacencyStore:
@@ -92,7 +96,10 @@ class PaperAdjacencyStore:
         for item in status["extractions"]:
             record = read_yaml(self.corpora.extraction_root / corpus_id / f"{item['paper_id']}.yaml")
             extraction_fingerprints.append(record["extraction_fingerprint"])
-            tuples.extend({**value, "paper_id": item["paper_id"]} for value in record["tuples"])
+            tuples.extend({
+                **value, "paper_id": item["paper_id"],
+                "_extraction_schema_version": record.get("schema_version", 1),
+            } for value in record["tuples"])
         return shown["record"], sorted(tuples, key=lambda value: value["id"]), sorted(extraction_fingerprints)
 
     @staticmethod
@@ -136,6 +143,9 @@ class PaperAdjacencyStore:
         input_fingerprint: str,
         shared_count: int,
         directed: bool,
+        generator_kind: str = "deterministic_structural",
+        generator_version: str = GENERATOR_VERSION,
+        semantic_score: float | None = None,
     ) -> dict[str, Any]:
         if relation in SYMMETRIC_RELATIONS and source > target:
             source, target = target, source
@@ -147,6 +157,7 @@ class PaperAdjacencyStore:
                 "metadata": paper["metadata"], "body": paper["body"],
             })
         structural = min(1.0, round(0.5 + 0.1 * max(shared_count - 1, 0), 4))
+        overall = semantic_score if semantic_score is not None else structural
         edge = {
             "corpus_id": corpus["id"],
             "from": source,
@@ -158,18 +169,28 @@ class PaperAdjacencyStore:
             "rationale": rationale,
             "score": {
                 "structural": structural,
-                "semantic": None,
-                "overall": structural,
-                "basis": f"deterministic shared-structure evidence; {shared_count} matched key(s)",
+                "semantic": semantic_score,
+                "overall": overall,
+                "basis": (
+                    f"deterministic accepted ontology/semantic-tuple evidence; {shared_count} matched key(s)"
+                    if semantic_score is not None
+                    else f"deterministic shared-structure evidence; {shared_count} matched key(s)"
+                ),
             },
             "generator": {
-                "kind": "deterministic_structural",
+                "kind": generator_kind,
                 "name": "ResearchFlow PaperAdjacency",
-                "version": GENERATOR_VERSION,
+                "version": generator_version,
                 "input_fingerprint": input_fingerprint,
             },
             "source_fingerprints": {source: fingerprints[source], target: fingerprints[target]},
         }
+        if generator_kind == "deterministic_semantic":
+            from .concepts import ConceptStore
+            edge["semantic_context"] = {
+                "vocabulary_fingerprint": ConceptStore(self.project).fingerprint(),
+                "algorithm": generator_version,
+            }
         edge["adjacency_fingerprint"] = adjacency_fingerprint(edge)
         return edge
 
@@ -236,30 +257,220 @@ class PaperAdjacencyStore:
         unique = {item["adjacency_fingerprint"]: item for item in candidates}
         return sorted(unique.values(), key=lambda item: (item["from"], item["relation"], item["to"]))
 
-    def build(self, corpus_id: str, *, dry_run: bool = False) -> dict[str, Any]:
+    def _semantic_candidates(
+        self, corpus: dict[str, Any], tuples: list[dict[str, Any]], input_fingerprint: str
+    ) -> list[dict[str, Any]]:
+        from .concepts import ConceptStore
+
+        concepts = ConceptStore(self.project)
+
+        def normalized(node: dict[str, Any]) -> dict[str, Any]:
+            return concepts.resolve(node["type"], node["key"])
+
+        by_paper: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        occurrences: dict[str, dict[tuple[str, str], list[dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
+        broader: dict[str, dict[tuple[str, str], list[dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
+        for item in tuples:
+            by_paper[item["paper_id"]].append(item)
+            for endpoint in ("subject", "object"):
+                node = item[endpoint]
+                resolved = normalized(node)
+                occurrences[item["paper_id"]][(node["type"], resolved["canonical_key"])].append(item)
+                for key in resolved["broader_keys"]:
+                    broader[item["paper_id"]][(node["type"], key)].append(item)
+
+        papers = sorted(by_paper)
+        candidates: list[dict[str, Any]] = []
+        shared_specs = (
+            (("Problem", "Task"), "same_problem", ["problem", "task"]),
+            (("Method",), "same_method_family", ["method"]),
+            (("Assumption",), "shares_assumption", ["assumption"]),
+            (("Dataset", "Metric"), "same_evaluation", ["evaluation"]),
+        )
+        for index, source in enumerate(papers):
+            for target in papers[index + 1:]:
+                for node_types, relation, dimensions in shared_specs:
+                    exact = sorted(
+                        marker for marker in set(occurrences[source]) & set(occurrences[target])
+                        if marker[0] in node_types
+                    )
+                    family = sorted(
+                        marker for marker in set(broader[source]) & set(broader[target])
+                        if marker[0] in node_types
+                    )
+                    matches = exact or family
+                    if not matches:
+                        continue
+                    source_tuples = [
+                        item for marker in matches
+                        for item in (occurrences[source][marker] if exact else broader[source][marker])
+                    ]
+                    target_tuples = [
+                        item for marker in matches
+                        for item in (occurrences[target][marker] if exact else broader[target][marker])
+                    ]
+                    labels = ", ".join(f"{kind}:{key}" for kind, key in matches)
+                    basis = "accepted canonical concept" if exact else "accepted broader concept"
+                    candidates.append(self._candidate(
+                        corpus=corpus, source=source, relation=relation, target=target,
+                        dimensions=dimensions, source_tuples=source_tuples, target_tuples=target_tuples,
+                        rationale=f"Both papers map to the same {basis}: {labels}.",
+                        input_fingerprint=input_fingerprint, shared_count=len(matches), directed=False,
+                        generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
+                        semantic_score=0.75 if exact else 0.65,
+                    ))
+
+        target_relations = {
+            "extends": ("extends_method", "Method", "proposes", ["method"]),
+            "replaces": ("replaces_component", None, "uses_component", ["component", "method"]),
+            "addresses": ("addresses_limitation", "Limitation", "limited_by", ["limitation"]),
+            "contradicts": ("contradicts_result", "Result", "reports_result", ["result"]),
+        }
+        for source in papers:
+            for source_tuple in by_paper[source]:
+                if source_tuple["relation"] not in target_relations:
+                    continue
+                relation, expected_type, target_relation, dimensions = target_relations[source_tuple["relation"]]
+                node = source_tuple["object"]
+                if expected_type and node["type"] != expected_type:
+                    continue
+                resolved = normalized(node)
+                keys = {resolved["canonical_key"], *resolved["broader_keys"]}
+                for target in papers:
+                    if target == source:
+                        continue
+                    matched = []
+                    for target_tuple in by_paper[target]:
+                        if target_tuple["relation"] != target_relation:
+                            continue
+                        target_node = target_tuple["object"]
+                        if expected_type and target_node["type"] != expected_type:
+                            continue
+                        target_resolved = normalized(target_node)
+                        target_keys = {target_resolved["canonical_key"], *target_resolved["broader_keys"]}
+                        if keys & target_keys:
+                            matched.append(target_tuple)
+                    if matched:
+                        candidates.append(self._candidate(
+                            corpus=corpus, source=source, relation=relation, target=target,
+                            dimensions=dimensions, source_tuples=[source_tuple], target_tuples=matched,
+                            rationale=(
+                                f"{source} explicitly reports `{source_tuple['relation']}` for "
+                                f"{node['type']}:{node['key']}, matching evidence in {target}."
+                            ),
+                            input_fingerprint=input_fingerprint, shared_count=len(matched), directed=True,
+                            generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
+                            semantic_score=0.85,
+                        ))
+
+        # A reported failure condition for a normalized Method can expose a
+        # boundary for another Paper using the same method or method family.
+        for source in papers:
+            for failure in (item for item in by_paper[source] if item["relation"] == "fails_under"):
+                method = normalized(failure["subject"])
+                keys = {method["canonical_key"], *method["broader_keys"]}
+                for target in papers:
+                    if target == source:
+                        continue
+                    matched = []
+                    for item in by_paper[target]:
+                        for endpoint in ("subject", "object"):
+                            node = item[endpoint]
+                            if node["type"] != "Method":
+                                continue
+                            other = normalized(node)
+                            if keys & {other["canonical_key"], *other["broader_keys"]}:
+                                matched.append(item)
+                                break
+                    if matched:
+                        candidates.append(self._candidate(
+                            corpus=corpus, source=source, relation="exposes_failure", target=target,
+                            dimensions=["method", "failure_condition"], source_tuples=[failure],
+                            target_tuples=matched,
+                            rationale=f"{source} reports a failure condition for a method family used by {target}.",
+                            input_fingerprint=input_fingerprint, shared_count=1, directed=True,
+                            generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
+                            semantic_score=0.8,
+                        ))
+
+        # One candidate per semantic triple; merge evidence produced through
+        # multiple matching concepts without hiding the deterministic rationale.
+        unique: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for item in candidates:
+            marker = (item["from"], item["relation"], item["to"])
+            if marker not in unique or item["score"]["overall"] > unique[marker]["score"]["overall"]:
+                unique[marker] = item
+        return sorted(unique.values(), key=lambda item: (item["from"], item["relation"], item["to"]))
+
+    def _build_inputs(self, corpus_id: str, mode: str) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
         corpus, tuples, extraction_fingerprints = self._corpus_inputs(corpus_id)
+        if mode not in {"structural", "semantic"}:
+            raise ResearchFlowError("Adjacency build mode must be structural or semantic.")
+        from .concepts import ConceptStore
+        vocabulary_fingerprint = ConceptStore(self.project).fingerprint() if mode == "semantic" else None
+        generator = SEMANTIC_GENERATOR_VERSION if mode == "semantic" else GENERATOR_VERSION
         input_fingerprint = canonical_hash({
             "corpus": corpus["corpus_fingerprint"],
             "extractions": extraction_fingerprints,
-            "generator": GENERATOR_VERSION,
+            "vocabulary": vocabulary_fingerprint,
+            "generator": generator,
         })
+        return corpus, tuples, input_fingerprint
+
+    def preview(self, corpus_id: str, *, mode: str = "structural") -> dict[str, Any]:
+        corpus, tuples, input_fingerprint = self._build_inputs(corpus_id, mode)
+        candidates = (
+            self._semantic_candidates(corpus, tuples, input_fingerprint)
+            if mode == "semantic"
+            else self._structural_candidates(corpus, tuples, input_fingerprint)
+        )
+        return {
+            "corpus_id": corpus_id, "mode": mode, "input_fingerprint": input_fingerprint,
+            "candidate_count": len(candidates), "relations": self._relation_counts(candidates),
+            "candidates": candidates,
+        }
+
+    def build(
+        self, corpus_id: str, *, mode: str = "structural", details: bool = False,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        corpus, _, input_fingerprint = self._build_inputs(corpus_id, mode)
         ledger = self.load()
         existing_build = next((item for item in ledger["builds"] if item["input_fingerprint"] == input_fingerprint), None)
         if existing_build:
-            return {**existing_build, "created": False, "idempotent": True, "dry_run": dry_run}
-        candidates = self._structural_candidates(corpus, tuples, input_fingerprint)
+            result = {
+                **existing_build, "mode": mode, "candidate_count": len(existing_build["edge_ids"]),
+                "created": False, "idempotent": True, "dry_run": dry_run,
+            }
+            if details:
+                preview = self.preview(corpus_id, mode=mode)
+                result["candidates"] = [self._candidate_summary(item) for item in preview["candidates"]]
+            return result
+        preview = self.preview(corpus_id, mode=mode)
+        candidates = preview["candidates"]
         if dry_run:
-            return {
+            result = {
                 "corpus_id": corpus_id, "input_fingerprint": input_fingerprint,
+                "mode": mode,
                 "candidate_count": len(candidates),
                 "relations": self._relation_counts(candidates),
                 "created": False, "idempotent": False, "dry_run": True,
             }
+            if details:
+                result["candidates"] = [self._candidate_summary(item) for item in candidates]
+            return result
         with exclusive_lock(self.project.root / LOCK_RELATIVE_PATH):
             ledger = self.load()
             existing_build = next((item for item in ledger["builds"] if item["input_fingerprint"] == input_fingerprint), None)
             if existing_build:
-                return {**existing_build, "created": False, "idempotent": True, "dry_run": False}
+                result = {
+                    **existing_build, "mode": mode, "candidate_count": len(existing_build["edge_ids"]),
+                    "created": False, "idempotent": True, "dry_run": False,
+                }
+                if details:
+                    preview = self.preview(corpus_id, mode=mode)
+                    result["candidates"] = [self._candidate_summary(item) for item in preview["candidates"]]
+                return result
             existing_fingerprints = {item["adjacency_fingerprint"]: item for item in ledger["edges"]}
             edge_ids: list[str] = []
             added = []
@@ -280,13 +491,215 @@ class PaperAdjacencyStore:
             build = {
                 "corpus_id": corpus_id,
                 "corpus_fingerprint": corpus["corpus_fingerprint"],
-                "generator_version": GENERATOR_VERSION,
+                "generator_version": SEMANTIC_GENERATOR_VERSION if mode == "semantic" else GENERATOR_VERSION,
                 "input_fingerprint": input_fingerprint,
                 "edge_ids": edge_ids,
                 "created_at": utc_now(),
             }
             self._write({**ledger, "edges": [*ledger["edges"], *added], "builds": [*ledger["builds"], build]})
             return {**build, "candidate_count": len(candidates), "created_edges": len(added), "created": True, "idempotent": False, "dry_run": False}
+
+    @staticmethod
+    def _candidate_summary(item: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "from": item["from"], "relation": item["relation"], "to": item["to"],
+            "dimensions": item["dimensions"], "score": item["score"],
+            "rationale": item["rationale"],
+            "evidence": [
+                {
+                    "paper_id": value["paper_id"], "tuple_ids": value["tuple_ids"],
+                    "claim_ids": value["claim_ids"], "locators": value["locators"],
+                }
+                for value in item["evidence"]
+            ],
+        }
+
+    @staticmethod
+    def _key_tokens(key: str) -> set[str]:
+        ignored = {
+            "a", "an", "and", "for", "in", "of", "on", "the", "to", "with",
+            "paper", "method", "task", "problem", "navigation", "assumption",
+            "limitation", "result", "component", "dataset", "metric",
+        }
+        return {
+            part for part in re.split(r"[./_-]+", key.casefold())
+            if len(part) > 1 and part not in ignored
+        }
+
+    def packet(self, corpus_id: str, *, top_k: int = 25) -> dict[str, Any]:
+        if top_k < 1:
+            raise ResearchFlowError("--top-k must be positive.")
+        corpus, tuples, input_fingerprint = self._build_inputs(corpus_id, "semantic")
+        from .concepts import ConceptStore
+        concepts = ConceptStore(self.project)
+        by_paper: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        profiles: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+        for item in tuples:
+            by_paper[item["paper_id"]].append(item)
+            for endpoint in ("subject", "object"):
+                node = item[endpoint]
+                resolved = concepts.resolve(node["type"], node["key"])
+                profiles[item["paper_id"]][node["type"]].add(resolved["canonical_key"])
+                profiles[item["paper_id"]][node["type"]].update(resolved["broader_keys"])
+
+        weights = {
+            "Problem": 1.0, "Task": 1.0, "Method": 1.0, "Component": 0.9,
+            "Assumption": 0.8, "Limitation": 0.9, "FailureCondition": 0.9,
+            "TrainingSignal": 0.8, "Feedback": 0.8, "Result": 0.8,
+            "Dataset": 0.5, "Metric": 0.5, "Embodiment": 0.5,
+        }
+        pairs = []
+        papers = sorted(by_paper)
+        for index, source in enumerate(papers):
+            for target in papers[index + 1:]:
+                signals = []
+                weighted_scores = []
+                for node_type, weight in weights.items():
+                    left = profiles[source].get(node_type, set())
+                    right = profiles[target].get(node_type, set())
+                    if not left or not right:
+                        continue
+                    exact = sorted(left & right)
+                    best = 0.0
+                    best_pair = None
+                    if exact:
+                        best = 1.0
+                        best_pair = (exact[0], exact[0])
+                    else:
+                        for left_key in left:
+                            left_tokens = self._key_tokens(left_key)
+                            for right_key in right:
+                                right_tokens = self._key_tokens(right_key)
+                                union = left_tokens | right_tokens
+                                score = len(left_tokens & right_tokens) / len(union) if union else 0.0
+                                if score > best:
+                                    best = score
+                                    best_pair = (left_key, right_key)
+                    if best > 0 and best_pair:
+                        weighted_scores.append((best, weight))
+                        signals.append({
+                            "dimension": node_type, "similarity": round(best, 4),
+                            "source_key": best_pair[0], "target_key": best_pair[1],
+                        })
+                if not weighted_scores:
+                    continue
+                score = sum(value * weight for value, weight in weighted_scores) / sum(
+                    weight for _, weight in weighted_scores
+                )
+                pairs.append({
+                    "from": source, "to": target, "recall_score": round(score, 4),
+                    "signals": sorted(signals, key=lambda item: (-item["similarity"], item["dimension"])),
+                })
+        pairs.sort(key=lambda item: (-item["recall_score"], item["from"], item["to"]))
+        titles = {
+            item["id"]: self.project.evidence.show(item["id"])["metadata"].get("title", item["id"])
+            for item in corpus["papers"]
+        }
+        selected = []
+        for pair in pairs[:top_k]:
+            selected.append({
+                **pair,
+                "papers": [
+                    {
+                        "paper_id": paper_id, "title": titles[paper_id],
+                        "extraction_schema_version": max(
+                            int(item.get("_extraction_schema_version", 1)) for item in by_paper[paper_id]
+                        ),
+                        "tuples": [
+                            {
+                                "id": item["id"], "subject": item["subject"],
+                                "relation": item["relation"], "object": item["object"],
+                                "assertion": item.get("assertion"), "evidence": item["evidence"],
+                            }
+                            for item in by_paper[paper_id]
+                        ],
+                    }
+                    for paper_id in (pair["from"], pair["to"])
+                ],
+            })
+        packet_fingerprint = canonical_hash({
+            "semantic_input": input_fingerprint, "algorithm": "pair-recall-v1",
+            "top_k": top_k, "pairs": selected,
+        })
+        return {
+            "schema_version": 1, "corpus_id": corpus_id,
+            "semantic_input_fingerprint": input_fingerprint,
+            "vocabulary_fingerprint": concepts.fingerprint(),
+            "packet_fingerprint": packet_fingerprint, "algorithm": "pair-recall-v1",
+            "top_k": top_k, "pair_count": len(selected), "pairs": selected,
+            "meaning": (
+                "Pair recall proposes comparisons for an Agent or human; it does not assign or accept a relationship."
+            ),
+        }
+
+    def evaluate(self, corpus_id: str, benchmark_file: Path, *, mode: str = "semantic") -> dict[str, Any]:
+        benchmark = read_yaml(benchmark_file.expanduser().resolve())
+        validate_record("adjacency_benchmark", benchmark)
+        if benchmark["corpus_id"] != corpus_id:
+            raise ResearchFlowError("Adjacency benchmark Corpus does not match --corpus.")
+        corpus = self.corpora.show(corpus_id)["record"]
+        if benchmark["corpus_fingerprint"] != corpus["corpus_fingerprint"]:
+            raise ResearchFlowError("Adjacency benchmark is stale for the current Corpus fingerprint.")
+        benchmark_content = {
+            key: benchmark[key]
+            for key in ("schema_version", "benchmark_id", "corpus_id", "corpus_fingerprint", "rationale", "cases")
+        }
+        benchmark_fingerprint = canonical_hash(benchmark_content)
+        if benchmark["review"]["reviewed_fingerprint"] != benchmark_fingerprint:
+            raise ResearchFlowError("Adjacency benchmark human review fingerprint is stale.")
+        corpus_papers = {item["id"] for item in corpus["papers"]}
+        seen: set[tuple[str, str, str]] = set()
+        normalized_cases = []
+        for case in benchmark["cases"]:
+            marker = (case["from"], case["relation"], case["to"])
+            if case["from"] == case["to"]:
+                raise ResearchFlowError("Adjacency benchmark cannot contain a self-pair.")
+            if case["from"] not in corpus_papers or case["to"] not in corpus_papers:
+                raise ResearchFlowError("Adjacency benchmark contains a Paper outside the Corpus.")
+            if case["relation"] in SYMMETRIC_RELATIONS and case["from"] > case["to"]:
+                marker = (case["to"], case["relation"], case["from"])
+            if marker in seen:
+                raise ResearchFlowError("Adjacency benchmark contains a duplicate case.")
+            seen.add(marker)
+            normalized_cases.append((case, marker))
+        preview = self.preview(corpus_id, mode=mode)
+        predicted = {(item["from"], item["relation"], item["to"]) for item in preview["candidates"]}
+        tp = fp = fn = tn = 0
+        cases = []
+        for case, marker in normalized_cases:
+            found = marker in predicted
+            expected = case["expected"]
+            if expected and found:
+                tp += 1
+            elif expected:
+                fn += 1
+            elif found:
+                fp += 1
+            else:
+                tn += 1
+            cases.append({**case, "predicted": found, "correct": expected == found})
+
+        def ratio(numerator: int, denominator: int) -> float | None:
+            return round(numerator / denominator, 4) if denominator else None
+
+        precision = ratio(tp, tp + fp)
+        recall = ratio(tp, tp + fn)
+        f1 = (
+            round(2 * precision * recall / (precision + recall), 4)
+            if precision is not None and recall is not None and precision + recall else None
+        )
+        return {
+            "benchmark_id": benchmark["benchmark_id"], "corpus_id": corpus_id,
+            "mode": mode, "reviewer": benchmark["review"]["reviewer"],
+            "benchmark_fingerprint": benchmark_fingerprint,
+            "input_fingerprint": preview["input_fingerprint"],
+            "candidate_count": preview["candidate_count"],
+            "confusion": {"tp": tp, "fp": fp, "fn": fn, "tn": tn},
+            "metrics": {"precision": precision, "recall": recall, "f1": f1},
+            "unscored_candidates": len(predicted - seen),
+            "cases": cases,
+            "meaning": "Metrics apply only to the named human-reviewed benchmark cases, not scientific validity.",
+        }
 
     def _normalize_request(self, request_file: Path) -> dict[str, Any]:
         request = read_yaml(request_file.expanduser().resolve())
@@ -316,6 +729,11 @@ class PaperAdjacencyStore:
                 if locator["kind"] == "path":
                     _safe_workspace_path(self.project, locator["value"])
         normalized = dict(request)
+        if request.get("semantic_context"):
+            from .concepts import ConceptStore
+            current_vocabulary = ConceptStore(self.project).fingerprint()
+            if request["semantic_context"]["vocabulary_fingerprint"] != current_vocabulary:
+                raise ResearchFlowError("Adjacency semantic context uses a stale concept vocabulary.")
         if request["relation"] in SYMMETRIC_RELATIONS and request["from"] > request["to"]:
             normalized["from"], normalized["to"] = request["to"], request["from"]
             normalized["evidence"] = sorted(request["evidence"], key=lambda item: item["paper_id"])
@@ -405,6 +823,18 @@ class PaperAdjacencyStore:
             issues.append(str(exc))
         if adjacency_fingerprint(edge) != edge["adjacency_fingerprint"]:
             issues.append("adjacency content fingerprint changed")
+        semantic_context = edge.get("semantic_context")
+        if semantic_context:
+            from .concepts import ConceptStore
+            if semantic_context["vocabulary_fingerprint"] != ConceptStore(self.project).fingerprint():
+                issues.append("accepted concept vocabulary changed")
+        if edge["generator"]["kind"] == "deterministic_semantic":
+            try:
+                _, _, current_input = self._build_inputs(edge["corpus_id"], "semantic")
+                if current_input != edge["generator"]["input_fingerprint"]:
+                    issues.append("semantic adjacency inputs changed")
+            except ResearchFlowError as exc:
+                issues.append(str(exc))
         review = edge["review"]
         if edge["status"] == "accepted" and review["reviewed_fingerprint"] != edge["adjacency_fingerprint"]:
             issues.append("accepted review is stale")
@@ -546,4 +976,12 @@ class PaperAdjacencyStore:
 
     def summary(self) -> dict[str, Any]:
         result = self.check()
-        return {key: result[key] for key in ("initialized", "valid", "builds", "edges", "accepted_current")}
+        from .concepts import ConceptStore
+        concepts = ConceptStore(self.project).check()
+        return {
+            **{key: result[key] for key in ("initialized", "valid", "builds", "edges", "accepted_current")},
+            "concepts": {
+                key: concepts[key]
+                for key in ("initialized", "valid", "concepts", "accepted", "fingerprint")
+            },
+        }

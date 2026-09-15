@@ -252,6 +252,22 @@ def run_doctor(project_id: str | None = None, probe_machines: bool = False) -> l
         except ResearchFlowError as exc:
             checks.append(Check(f"project {candidate} paper adjacency", False, str(exc)))
         try:
+            from .concepts import ConceptStore
+            concepts = ConceptStore(project).check()
+            if not concepts["initialized"]:
+                checks.append(Check(
+                    f"project {candidate} paper concepts", True,
+                    "not initialized; semantic matching uses extraction keys as-is", "warning",
+                ))
+            else:
+                checks.append(Check(
+                    f"project {candidate} paper concepts", concepts["valid"],
+                    f"{concepts['concepts']} concept(s), {concepts['accepted']} human-accepted",
+                    "pass" if concepts["valid"] else "fail",
+                ))
+        except ResearchFlowError as exc:
+            checks.append(Check(f"project {candidate} paper concepts", False, str(exc)))
+        try:
             from .evidence_graph import EvidenceGraphStore
             graph = EvidenceGraphStore(project).check()
             if not graph["initialized"]:

@@ -22,6 +22,7 @@ ID_WIDTHS = {
     "CGAPRUN": 6,
     "EGAUDIT": 6,
     "PADJ": 6,
+    "CONCEPT": 6,
 }
 
 

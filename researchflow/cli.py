@@ -272,6 +272,8 @@ def parser() -> argparse.ArgumentParser:
     adjacency_actions = adjacency.add_subparsers(dest="action", required=True)
     adjacency_build = adjacency_actions.add_parser("build", help="derive deterministic candidates from accepted Corpus extractions")
     adjacency_build.add_argument("--corpus", required=True)
+    adjacency_build.add_argument("--mode", choices=("structural", "semantic"), default="structural")
+    adjacency_build.add_argument("--details", action="store_true")
     adjacency_build.add_argument("--dry-run", action="store_true")
     adjacency_add = adjacency_actions.add_parser("add", help="import an evidence-bound manual or agent-proposed adjacency")
     adjacency_add.add_argument("request", type=Path)
@@ -302,6 +304,31 @@ def parser() -> argparse.ArgumentParser:
     adjacency_promote = adjacency_actions.add_parser("promote", help="copy one accepted adjacency into EvidenceGraph with PADJ provenance")
     adjacency_promote.add_argument("id")
     adjacency_promote.add_argument("--dry-run", action="store_true")
+    adjacency_packet = adjacency_actions.add_parser("packet", help="emit ranked evidence packets for human or Agent pair comparison")
+    adjacency_packet.add_argument("--corpus", required=True)
+    adjacency_packet.add_argument("--top-k", type=int, default=25)
+    adjacency_evaluate = adjacency_actions.add_parser("evaluate", help="score candidate recall against a human-reviewed benchmark")
+    adjacency_evaluate.add_argument("--corpus", required=True)
+    adjacency_evaluate.add_argument("--benchmark", required=True, type=Path)
+    adjacency_evaluate.add_argument("--mode", choices=("structural", "semantic"), default="semantic")
+    concept_add = adjacency_actions.add_parser("concept-add", help="add a review-pending concept normalization")
+    concept_add.add_argument("request", type=Path)
+    concept_add.add_argument("--dry-run", action="store_true")
+    concept_list = adjacency_actions.add_parser("concept-list")
+    concept_list.add_argument("--status", choices=("candidate", "accepted", "revision_requested", "rejected"))
+    concept_list.add_argument("--type", dest="node_type")
+    concept_show = adjacency_actions.add_parser("concept-show")
+    concept_show.add_argument("id")
+    concept_review = adjacency_actions.add_parser("concept-review")
+    concept_review.add_argument("id")
+    concept_review.add_argument("--decision", choices=("accepted", "revision_requested", "rejected"), required=True)
+    concept_review.add_argument("--reviewer", required=True)
+    concept_review.add_argument("--rationale-file", required=True, type=Path)
+    concept_review.add_argument("--dry-run", action="store_true")
+    concept_resolve = adjacency_actions.add_parser("concept-resolve")
+    concept_resolve.add_argument("--type", required=True, dest="node_type")
+    concept_resolve.add_argument("--key", required=True)
+    adjacency_actions.add_parser("concept-check")
     graph = evidence_actions.add_parser("graph", help="manage the rebuildable project EvidenceGraph")
     graph_actions = graph.add_subparsers(dest="action", required=True)
     graph_connect = graph_actions.add_parser("connect", help="add one typed, fingerprint-bound relationship")
@@ -440,6 +467,12 @@ def parser() -> argparse.ArgumentParser:
     scaffold_extraction.add_argument("--corpus", required=True)
     scaffold_extraction.add_argument("--paper", required=True)
     scaffold_extraction.add_argument("--output", required=True, type=Path)
+    scaffold_extraction_v2 = scaffold_actions.add_parser("corpus-extraction-v2")
+    scaffold_extraction_v2.add_argument("--corpus", required=True)
+    scaffold_extraction_v2.add_argument("--paper", required=True)
+    scaffold_extraction_v2.add_argument("--output", required=True, type=Path)
+    scaffold_concept = scaffold_actions.add_parser("paper-concept")
+    scaffold_concept.add_argument("--output", required=True, type=Path)
     scaffold_graph_review = scaffold_actions.add_parser("graph-review")
     scaffold_graph_review.add_argument("--claim", required=True)
     scaffold_graph_review.add_argument("--output", required=True, type=Path)
@@ -451,7 +484,7 @@ def parser() -> argparse.ArgumentParser:
 
     preflight = commands.add_parser("preflight", help="validate a draft before a formal atomic write")
     preflight.add_argument(
-        "kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact", "problem", "claim", "corpus-extraction", "paper-adjacency", "graph-review")
+        "kind", choices=("paper-analysis", "matrix-entry", "matrix-synthesis", "artifact", "problem", "claim", "corpus-extraction", "corpus-extraction-v2", "paper-concept", "paper-adjacency", "graph-review")
     )
     preflight.add_argument("path", type=Path)
 
@@ -666,7 +699,9 @@ def execute(args: argparse.Namespace) -> int:
             from .adjacency import PaperAdjacencyStore
             adjacency_store = PaperAdjacencyStore(project)
             if args.action == "build":
-                dump(adjacency_store.build(args.corpus, dry_run=args.dry_run))
+                dump(adjacency_store.build(
+                    args.corpus, mode=args.mode, details=args.details, dry_run=args.dry_run,
+                ))
             elif args.action == "add":
                 dump(adjacency_store.add_file(args.request, dry_run=args.dry_run))
             elif args.action == "list":
@@ -689,8 +724,33 @@ def execute(args: argparse.Namespace) -> int:
                 return 0 if result["valid"] else 1
             elif args.action == "promote":
                 dump(adjacency_store.promote(args.id, dry_run=args.dry_run))
-            else:
+            elif args.action == "export":
                 dump(adjacency_store.export(args.output, format=args.format, dry_run=args.dry_run))
+            elif args.action == "packet":
+                dump(adjacency_store.packet(args.corpus, top_k=args.top_k))
+            elif args.action == "evaluate":
+                dump(adjacency_store.evaluate(args.corpus, args.benchmark, mode=args.mode))
+            else:
+                from .concepts import ConceptStore
+                concepts = ConceptStore(project)
+                if args.action == "concept-add":
+                    dump(concepts.add_file(args.request, dry_run=args.dry_run))
+                elif args.action == "concept-list":
+                    dump(concepts.list(status=args.status, node_type=args.node_type))
+                elif args.action == "concept-show":
+                    dump(concepts.show(args.id))
+                elif args.action == "concept-review":
+                    rationale = args.rationale_file.expanduser().resolve().read_text(encoding="utf-8")
+                    dump(concepts.review(
+                        args.id, decision=args.decision, reviewer=args.reviewer,
+                        rationale=rationale, dry_run=args.dry_run,
+                    ))
+                elif args.action == "concept-resolve":
+                    dump(concepts.resolve(args.node_type, args.key))
+                else:
+                    result = concepts.check()
+                    dump(result)
+                    return 0 if result["valid"] else 1
         elif args.evidence_kind in {"problem", "claim"}:
             from .evidence_graph import ClaimStore, ProblemStore
             records = ProblemStore(project) if args.evidence_kind == "problem" else ClaimStore(project)
@@ -815,6 +875,12 @@ def execute(args: argparse.Namespace) -> int:
         elif args.scaffold_kind == "corpus-extraction":
             from .corpus_gap import CorpusStore
             print(CorpusStore(project).scaffold_extraction(args.corpus, args.paper, args.output))
+        elif args.scaffold_kind == "corpus-extraction-v2":
+            from .corpus_gap import CorpusStore
+            print(CorpusStore(project).scaffold_extraction_v2(args.corpus, args.paper, args.output))
+        elif args.scaffold_kind == "paper-concept":
+            from .scaffold import concept_scaffold
+            print(concept_scaffold(args.output))
         elif args.scaffold_kind == "paper-adjacency":
             from .scaffold import paper_adjacency_scaffold
             print(paper_adjacency_scaffold(project, args.corpus, args.source, args.target, args.output))

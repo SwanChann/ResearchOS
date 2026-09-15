@@ -52,6 +52,13 @@ def record_exists(project: ResearchProject, ref: str) -> bool:
             return True
         except ResearchFlowError:
             return False
+    if prefix == "CONCEPT":
+        try:
+            from .concepts import ConceptStore
+            ConceptStore(project).show(ref)
+            return True
+        except ResearchFlowError:
+            return False
     folder = locations.get(prefix)
     if folder is None:
         return False

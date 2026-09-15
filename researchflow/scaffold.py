@@ -172,6 +172,17 @@ def paper_adjacency_scaffold(project, corpus_id: str, source: str, target_id: st
     return target
 
 
+def concept_scaffold(output: Path) -> Path:
+    target = _new_target(output)
+    write_yaml(target, {
+        "type": "Task", "canonical_key": "draft/task", "label": "DRAFT task",
+        "aliases": [], "broader_key": None, "related_keys": [],
+        "rationale": "DRAFT: explain why these keys denote the same concept and preserve meaningful boundaries.",
+        "source": {"kind": "agent", "name": "DRAFT", "version": "concept-v1"},
+    })
+    return target
+
+
 def preflight(project, kind: str, path: Path) -> dict[str, Any]:
     source = path.expanduser().resolve()
     if kind == "paper-analysis":
@@ -194,6 +205,13 @@ def preflight(project, kind: str, path: Path) -> dict[str, Any]:
         return __import__("researchflow.evidence_graph", fromlist=["ClaimStore"]).ClaimStore(project).preflight(source)
     if kind == "corpus-extraction":
         return __import__("researchflow.corpus_gap", fromlist=["CorpusStore"]).CorpusStore(project).preflight_extraction(source)
+    if kind == "corpus-extraction-v2":
+        request = __import__("researchflow.io", fromlist=["read_yaml"]).read_yaml(source)
+        if request.get("schema_version") != 2:
+            raise ResearchFlowError("corpus-extraction-v2 preflight requires schema_version: 2.")
+        return __import__("researchflow.corpus_gap", fromlist=["CorpusStore"]).CorpusStore(project).preflight_extraction(source)
+    if kind == "paper-concept":
+        return __import__("researchflow.concepts", fromlist=["ConceptStore"]).ConceptStore(project).preflight(source)
     if kind == "paper-adjacency":
         return __import__("researchflow.adjacency", fromlist=["PaperAdjacencyStore"]).PaperAdjacencyStore(project).preflight(source)
     if kind == "graph-review":

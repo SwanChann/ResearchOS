@@ -118,7 +118,7 @@ No database is authoritative. Datasets and large checkpoints stay in their confi
 
 ## Problems, Claims, and EvidenceGraph
 
-ResearchFlow 0.7.0 adds RFC-0002 PaperAdjacency to the RFC-0001 CorpusGap + EvidenceGraph foundation: frozen verified-paper Corpora, reviewed structured extractions, evidence-bound PAPER-to-PAPER candidates, adjacency-aware Gap motifs, human-only acceptance/approval, formal `PROB-*`/`CLAIM-*` records, and a typed EvidenceGraph. A passing structural check does not establish semantic validity or scientific truth.
+ResearchFlow 0.8.0 extends RFC-0002 PaperAdjacency with Extraction V2 coverage declarations, a human-reviewed project concept vocabulary, deterministic semantic candidates, ranked comparison packets, and benchmark-scoped adjacency evaluation. It retains the RFC-0001 CorpusGap + EvidenceGraph foundation. A passing structural or semantic-generator check does not establish semantic validity, novelty, or scientific truth.
 
 ```powershell
 rf scaffold problem --output .\problem.yaml
@@ -139,10 +139,17 @@ rf evidence graph rebuild --dry-run
 
 CorpusGap never converts a paper summary directly into an accepted research direction. It freezes the current verified matrix, imports locator-bound tuples, requires `human:*` acceptance for every extraction, produces deterministic heuristic candidates, and requires another explicit `human:*` approval before `hypothesis new --gap` is allowed. Use `--test-only` for fixtures and mock evaluations.
 
-PaperAdjacency turns accepted Corpus tuples into explainable PAPER-to-PAPER candidates. It can query neighbors, import advanced Agent/human proposals, bind reviews to Paper-analysis fingerprints, promote accepted edges into EvidenceGraph, and let Gap motifs require or test the absence of reviewed relations. It has no silent model call: generated edges remain candidates until a `human:*` reviewer accepts them.
+PaperAdjacency turns accepted Corpus tuples into explainable PAPER-to-PAPER candidates. V2 requires an explicit disposition for problem, method/components, training, evaluation, results, assumptions, limitations, failure conditions, and prior-work delta; `not_reported` is preserved instead of silently becoming missing data. Accepted concepts normalize aliases and broader families, while semantic candidates remain deterministic and review-pending. `packet` ranks pairs for human/Agent reading but creates no relationship; `evaluate` reports precision/recall/F1 only against an explicit `human:*` benchmark. There is no silent model or embedding call.
 
 ```powershell
 rf evidence adjacency build --corpus CORPUS-0001 --dry-run
+rf scaffold corpus-extraction-v2 --corpus CORPUS-0001 --paper PAPER-0001 --output extraction-v2.yaml
+rf scaffold paper-concept --output concept.yaml
+rf evidence adjacency concept-add concept.yaml --dry-run
+rf evidence adjacency concept-review CONCEPT-000001 --decision accepted --reviewer human:NAME --rationale-file review.md
+rf evidence adjacency build --corpus CORPUS-0001 --mode semantic --details --dry-run
+rf evidence adjacency packet --corpus CORPUS-0001 --top-k 25
+rf evidence adjacency evaluate --corpus CORPUS-0001 --benchmark benchmark.yaml --mode semantic
 rf evidence adjacency build --corpus CORPUS-0001
 rf evidence adjacency list --status candidate
 rf evidence adjacency neighbors PAPER-0001 --status candidate
@@ -228,13 +235,14 @@ python -m pytest tests/test_e2e_toy.py -q
 - [System-build handoff](docs/handoffs/researchflow-system-build.md)
 - [RFC-0001: CorpusGap + EvidenceGraph](docs/rfcs/RFC-0001-corpus-gap-evidence-graph.md)
 - [RFC-0002: PaperAdjacency](docs/rfcs/RFC-0002-paper-adjacency.md)
+- [RFC-0003: Extraction V2 and semantic PaperAdjacency](docs/rfcs/RFC-0003-extraction-v2-semantic-adjacency.md)
 
 ## Current limitations
 
 - SSH submit/status/collect/register has been validated against a real server with a deterministic `TEST / MOCK`, CPU-only fixture. This proves the remote workflow and provenance path, not GPU scheduling quality or any scientific result.
 - A remote heavy run uses an atomic server-side lock directory. The protocol coordinates ResearchFlow clients, but unrelated processes can ignore it; no real GPU/heavy workload has been validated yet.
 - Remote repositories must already contain the pinned commit. Datasets, checkpoints, videos, and repository contents are never auto-synchronized; remote worktrees/runs are retained and are not automatically cleaned up.
-- Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow supplies a page-cited deep-read template, explicit verification/fingerprint gates, and deterministic structural Paper adjacency, but has no built-in PDF parser, embeddings, or vector database.
+- Literature analysis remains human/agent-assisted. Zotero supplies local full-text search, attachment/annotation context, and citation formatting; ResearchFlow supplies a page-cited deep-read template, explicit verification/fingerprint gates, deterministic structural/ontology-normalized Paper adjacency, and a lexical comparison queue, but has no built-in PDF parser, embeddings, or vector database.
 - The cross-paper matrix has versioned templates/custom axes, explicit migration, completeness/evidence validation, and deterministic rendering. Its cells still require primary-source reading; scaffolded text is an agent-generated draft, not a scientific judgment.
 - ID allocation is atomic on one local filesystem, not a distributed multi-writer protocol.
 - There is no remote cancel command, GUI, cloud sync, scheduler daemon, or automatic merge/push.
@@ -242,4 +250,4 @@ python -m pytest tests/test_e2e_toy.py -q
 - EvidenceGraph has no autonomous repair loop or built-in model provider. L2/L3 results enter through a fingerprint-bound review file, so unavailable review fails closed rather than being treated as a pass.
 - Existing projects remain readable without migration. Real migration is never triggered by `status`, `doctor`, package installation, or schema availability; it requires an explicit dry-run fingerprint and a verified snapshot.
 
-The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, semantic-provider selection, additional deep reads, real-project adoption, remote cancellation, and retention automation remain separately authorized workflows and do not block the V0.7.0 local software boundary.
+The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, embedding/provider selection, additional deep reads, real-project V2 writes, remote cancellation, and retention automation remain separately authorized workflows and do not block the V0.8.0 local software boundary.

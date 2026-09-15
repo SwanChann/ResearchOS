@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["type", "key"],
+      "properties": {
+        "type": {"enum": ["Paper", "Problem", "Method", "Component", "Task", "Dataset", "Metric", "Assumption", "Result", "Limitation", "FailureCondition", "TrainingSignal", "Feedback", "Embodiment"]},
+        "key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$"},
+        "label": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "locator": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {"enum": ["page", "section", "figure", "table", "paragraph", "path"]},
+        "value": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["paper_claim_ids", "locators", "exact_text_sha256"],
+      "properties": {
+        "paper_claim_ids": {"type": "array", "items": {"type": "string", "pattern": "^C[0-9]{2}$"}, "minItems": 1, "uniqueItems": true},
+        "locators": {"type": "array", "items": {"$ref": "#/$defs/locator"}, "minItems": 1},
+        "exact_text_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "tuple": {
+      "type": "object",
+      "required": ["subject", "relation", "object", "assertion", "evidence", "epistemic_status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^TUPLE-[0-9a-f]{12}$"},
+        "subject": {"$ref": "#/$defs/node"},
+        "relation": {"enum": ["proposes", "studies", "uses_component", "trained_with", "uses_feedback", "evaluated_on", "uses_dataset", "measured_by", "reports_result", "improves_over", "extends", "replaces", "addresses", "generalizes_to", "fails_under", "assumes", "requires", "limited_by", "contradicts", "compared_with"]},
+        "object": {"$ref": "#/$defs/node"},
+        "assertion": {"type": "string", "minLength": 1},
+        "evidence": {"$ref": "#/$defs/evidence"},
+        "epistemic_status": {"const": "paper_reported"}
+      },
+      "additionalProperties": false
+    },
+    "coverage_item": {
+      "type": "object",
+      "required": ["status", "rationale"],
+      "properties": {
+        "status": {"enum": ["covered", "not_reported", "not_applicable"]},
+        "rationale": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "corpus_id", "paper_id", "paper_fingerprint", "extractor", "coverage", "tuples"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "corpus_id": {"type": "string", "pattern": "^CORPUS-[0-9]{4}$"},
+    "paper_id": {"type": "string", "pattern": "^PAPER-[0-9]{4}$"},
+    "paper_fingerprint": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+    "extractor": {
+      "type": "object",
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": {"enum": ["agent", "human", "tool"]},
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["problem", "method_components", "training", "evaluation", "results", "assumptions", "limitations", "failure_conditions", "prior_work_delta"],
+      "properties": {
+        "problem": {"$ref": "#/$defs/coverage_item"},
+        "method_components": {"$ref": "#/$defs/coverage_item"},
+        "training": {"$ref": "#/$defs/coverage_item"},
+        "evaluation": {"$ref": "#/$defs/coverage_item"},
+        "results": {"$ref": "#/$defs/coverage_item"},
+        "assumptions": {"$ref": "#/$defs/coverage_item"},
+        "limitations": {"$ref": "#/$defs/coverage_item"},
+        "failure_conditions": {"$ref": "#/$defs/coverage_item"},
+        "prior_work_delta": {"$ref": "#/$defs/coverage_item"}
+      },
+      "additionalProperties": false
+    },
+    "tuples": {"type": "array", "items": {"$ref": "#/$defs/tuple"}, "minItems": 1}
+  },
+  "additionalProperties": false
+}

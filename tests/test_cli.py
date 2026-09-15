@@ -214,9 +214,12 @@ def test_corpus_gap_graph_and_migration_cli_routes():
 
 
 def test_paper_adjacency_cli_routes():
-    build = parser().parse_args(["evidence", "adjacency", "build", "--corpus", "CORPUS-0001", "--dry-run"])
-    assert (build.evidence_kind, build.action, build.corpus, build.dry_run) == (
-        "adjacency", "build", "CORPUS-0001", True,
+    build = parser().parse_args([
+        "evidence", "adjacency", "build", "--corpus", "CORPUS-0001",
+        "--mode", "semantic", "--details", "--dry-run",
+    ])
+    assert (build.evidence_kind, build.action, build.corpus, build.mode, build.details, build.dry_run) == (
+        "adjacency", "build", "CORPUS-0001", "semantic", True, True,
     )
     neighbors = parser().parse_args(["evidence", "adjacency", "neighbors", "PAPER-0001", "--top-k", "5"])
     assert (neighbors.action, neighbors.paper_id, neighbors.top_k, neighbors.status) == (
@@ -228,6 +231,30 @@ def test_paper_adjacency_cli_routes():
     ])
     assert (scaffold.scaffold_kind, scaffold.source, scaffold.target) == (
         "paper-adjacency", "PAPER-0001", "PAPER-0002",
+    )
+    packet = parser().parse_args([
+        "evidence", "adjacency", "packet", "--corpus", "CORPUS-0001", "--top-k", "7",
+    ])
+    assert (packet.action, packet.corpus, packet.top_k) == ("packet", "CORPUS-0001", 7)
+    evaluate = parser().parse_args([
+        "evidence", "adjacency", "evaluate", "--corpus", "CORPUS-0001",
+        "--benchmark", "benchmark.yaml", "--mode", "semantic",
+    ])
+    assert (evaluate.action, str(evaluate.benchmark), evaluate.mode) == (
+        "evaluate", "benchmark.yaml", "semantic",
+    )
+    concept = parser().parse_args([
+        "evidence", "adjacency", "concept-resolve", "--type", "Task", "--key", "continuous-vln",
+    ])
+    assert (concept.action, concept.node_type, concept.key) == (
+        "concept-resolve", "Task", "continuous-vln",
+    )
+    v2 = parser().parse_args([
+        "scaffold", "corpus-extraction-v2", "--corpus", "CORPUS-0001",
+        "--paper", "PAPER-0001", "--output", "v2.yaml",
+    ])
+    assert (v2.scaffold_kind, v2.corpus, v2.paper) == (
+        "corpus-extraction-v2", "CORPUS-0001", "PAPER-0001",
     )
 
 
