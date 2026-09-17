@@ -17,7 +17,7 @@ from .schema import validate_record
 ADJACENCY_RELATIVE_PATH = Path(".research/paper-adjacency/edges.yaml")
 LOCK_RELATIVE_PATH = Path(".locks/paper-adjacency-write.lock")
 GENERATOR_VERSION = "structural-v1.1"
-SEMANTIC_GENERATOR_VERSION = "semantic-v2.1"
+SEMANTIC_GENERATOR_VERSION = "semantic-v2.2"
 
 RELATIONS = {
     "same_problem", "same_method_family", "extends_method", "replaces_component",
@@ -98,7 +98,7 @@ class PaperAdjacencyStore:
         shown = self.corpora.show(corpus_id)
         if not shown["verification"]["valid"]:
             raise ResearchFlowError("Paper adjacency requires a valid current Corpus: " + "; ".join(shown["verification"]["issues"]))
-        status = self.corpora.extraction_status(corpus_id)
+        status = self.corpora.extraction_status(corpus_id, corpus=shown["record"])
         if not status["complete_and_reviewed"]:
             missing = [item["paper_id"] for item in status["extractions"] if not item.get("accepted")]
             raise ResearchFlowError(
@@ -402,7 +402,10 @@ class PaperAdjacencyStore:
         # A failure transfers directly to the same adopted canonical Method.
         # A broader family match is only a candidate when the papers also share
         # a FailureCondition, Task, or Assumption; family membership alone is
-        # not evidence that a concrete failure applies to another method.
+        # not evidence that a concrete failure applies to another method. Such
+        # a family-only match is retained as a boundary-case comparison, not as
+        # failure propagation. An exact compared_with link is role-aware direct
+        # evidence that the target evaluates the failed baseline.
         for source in papers:
             for failure in (item for item in by_paper[source] if item["relation"] == "fails_under"):
                 method = normalized(failure["subject"])
@@ -414,6 +417,15 @@ class PaperAdjacencyStore:
                     context: list[tuple[str, str]] = []
                     match_basis = "same canonical method"
                     if not matched:
+                        matched = [
+                            item for item in by_paper[target]
+                            if item["relation"] == "compared_with"
+                            and item["object"]["type"] == "Method"
+                            and normalized(item["object"])["canonical_key"] == method["canonical_key"]
+                        ]
+                        if matched:
+                            match_basis = "exact compared_with baseline"
+                    if not matched:
                         family_keys = set(method["broader_keys"])
                         family_markers = [("Method", key) for key in sorted(family_keys)]
                         matched = [item for marker in family_markers for item in broader[target].get(marker, [])]
@@ -421,7 +433,28 @@ class PaperAdjacencyStore:
                             marker for marker in set(occurrences[source]) & set(occurrences[target])
                             if marker[0] in {"FailureCondition", "Task", "Assumption"}
                         )
-                        if not matched or not context:
+                        if not matched:
+                            continue
+                        if not context:
+                            if any(item["relation"] == "fails_under" for item in by_paper[target]):
+                                continue
+                            candidates.append(self._candidate(
+                                corpus=corpus, source=source, relation="boundary_case", target=target,
+                                dimensions=["method", "failure_condition"], source_tuples=[failure],
+                                target_tuples=matched,
+                                rationale=(
+                                    f"{source} reports a failure inside the accepted broader method family "
+                                    f"shared with {target}, whose extraction reports no failure condition; "
+                                    "without matched task, assumption, or failure context, "
+                                    "this is a boundary comparison rather than transferred failure evidence."
+                                ),
+                                input_fingerprint=input_fingerprint, shared_count=1, directed=True,
+                                generator_kind="deterministic_semantic",
+                                generator_version=SEMANTIC_GENERATOR_VERSION,
+                                semantic_score=0.55,
+                                paper_fingerprints=paper_fingerprints,
+                                vocabulary_fingerprint=vocabulary_fingerprint,
+                            ))
                             continue
                         match_basis = "shared broader method family plus " + ", ".join(
                             f"{kind}:{key}" for kind, key in context
@@ -448,13 +481,15 @@ class PaperAdjacencyStore:
                 unique[marker] = item
         return sorted(unique.values(), key=lambda item: (item["from"], item["relation"], item["to"]))
 
-    def _build_inputs(self, corpus_id: str, mode: str) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+    def _build_inputs(
+        self, corpus_id: str, mode: str, *, generator_version: str | None = None,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
         corpus, tuples, extraction_fingerprints = self._corpus_inputs(corpus_id)
         if mode not in {"structural", "semantic"}:
             raise ResearchFlowError("Adjacency build mode must be structural or semantic.")
         from .concepts import ConceptStore
         vocabulary_fingerprint = ConceptStore(self.project).fingerprint() if mode == "semantic" else None
-        generator = SEMANTIC_GENERATOR_VERSION if mode == "semantic" else GENERATOR_VERSION
+        generator = generator_version or (SEMANTIC_GENERATOR_VERSION if mode == "semantic" else GENERATOR_VERSION)
         input_fingerprint = canonical_hash({
             "corpus": corpus["corpus_fingerprint"],
             "extractions": extraction_fingerprints,
@@ -685,7 +720,7 @@ class PaperAdjacencyStore:
         validate_record("adjacency_benchmark", benchmark)
         if benchmark["corpus_id"] != corpus_id:
             raise ResearchFlowError("Adjacency benchmark Corpus does not match --corpus.")
-        corpus = self.corpora.show(corpus_id)["record"]
+        corpus, tuples, _ = self._corpus_inputs(corpus_id)
         if benchmark["corpus_fingerprint"] != corpus["corpus_fingerprint"]:
             raise ResearchFlowError("Adjacency benchmark is stale for the current Corpus fingerprint.")
         benchmark_content = {
@@ -731,6 +766,7 @@ class PaperAdjacencyStore:
             )
         tp = fp = fn = tn = 0
         cases = []
+        false_negative_diagnostics = []
         for case, marker in normalized_cases:
             found = marker in predicted
             expected = case["expected"]
@@ -742,7 +778,15 @@ class PaperAdjacencyStore:
                 fp += 1
             else:
                 tn += 1
-            cases.append({**case, "predicted": found, "correct": expected == found})
+            evaluated = {**case, "predicted": found, "correct": expected == found}
+            if expected and not found:
+                diagnosis = self._miss_diagnosis(case, tuples)
+                evaluated["miss_diagnosis"] = diagnosis
+                false_negative_diagnostics.append({
+                    "from": case["from"], "relation": case["relation"], "to": case["to"],
+                    **diagnosis,
+                })
+            cases.append(evaluated)
 
         def ratio(numerator: int, denominator: int) -> float | None:
             return round(numerator / denominator, 4) if denominator else None
@@ -762,8 +806,79 @@ class PaperAdjacencyStore:
             "confusion": {"tp": tp, "fp": fp, "fn": fn, "tn": tn},
             "metrics": {"precision": precision, "recall": recall, "f1": f1},
             "unscored_candidates": len(predicted - seen),
+            "false_negative_diagnostics": false_negative_diagnostics,
             "cases": cases,
             "meaning": "Metrics apply only to the named human-reviewed benchmark cases, not scientific validity.",
+        }
+
+    def _miss_diagnosis(
+        self, case: dict[str, Any], tuples: list[dict[str, Any]],
+    ) -> dict[str, str]:
+        from .concepts import ConceptStore
+
+        concepts = ConceptStore(self.project)
+
+        def keys(paper_id: str, node_types: set[str]) -> set[tuple[str, str]]:
+            result: set[tuple[str, str]] = set()
+            for item in tuples:
+                if item["paper_id"] != paper_id:
+                    continue
+                for endpoint in ("subject", "object"):
+                    if not self._is_role_occurrence(item, endpoint):
+                        continue
+                    node = item[endpoint]
+                    if node["type"] not in node_types:
+                        continue
+                    resolved = concepts.resolve(node["type"], node["key"])
+                    result.add((node["type"], resolved["canonical_key"]))
+                    result.update((node["type"], value) for value in resolved["broader_keys"])
+            return result
+
+        relation = case["relation"]
+        if relation == "same_problem":
+            shared = keys(case["from"], {"Problem", "Task"}) & keys(case["to"], {"Problem", "Task"})
+            if shared:
+                return {
+                    "category": "generator_rule_missing",
+                    "next_action": "Inspect the semantic generator because accepted Problem/Task alignment already exists.",
+                }
+            return {
+                "category": "missing_problem_or_task_alignment",
+                "next_action": (
+                    "Review the two Problem/Task keys and add a human-accepted concept mapping only if the papers "
+                    "really study the same problem; method-family overlap is not sufficient."
+                ),
+            }
+        if relation == "extends_method":
+            def method_objects(paper_id: str, relation_name: str) -> set[str]:
+                result = set()
+                for item in tuples:
+                    if item["paper_id"] != paper_id or item["relation"] != relation_name:
+                        continue
+                    node = item["object"]
+                    if node["type"] != "Method":
+                        continue
+                    resolved = concepts.resolve("Method", node["key"])
+                    result.add(resolved["canonical_key"])
+                    result.update(resolved["broader_keys"])
+                return result
+
+            explicit_match = method_objects(case["from"], "extends") & method_objects(case["to"], "proposes")
+            if explicit_match:
+                return {
+                    "category": "generator_rule_missing",
+                    "next_action": "Inspect the semantic generator because matching explicit extension evidence already exists.",
+                }
+            return {
+                "category": "missing_explicit_extension_evidence",
+                "next_action": (
+                    "Verify and extract an explicit extends relation, or retain a manual reviewed adjacency; "
+                    "compared_with alone does not prove method extension."
+                ),
+            }
+        return {
+            "category": "generator_rule_or_structured_evidence_missing",
+            "next_action": "Inspect the reviewed extraction and ontology before adding a narrower deterministic rule.",
         }
 
     def _normalize_request(self, request_file: Path) -> dict[str, Any]:
@@ -907,9 +1022,11 @@ class PaperAdjacencyStore:
                 issues.append("accepted concept vocabulary changed")
         if edge["generator"]["kind"] == "deterministic_semantic":
             try:
-                marker = (edge["corpus_id"], "semantic")
+                marker = (edge["corpus_id"], "semantic", edge["generator"]["version"])
                 if marker not in build_cache:
-                    build_cache[marker] = self._build_inputs(edge["corpus_id"], "semantic")
+                    build_cache[marker] = self._build_inputs(
+                        edge["corpus_id"], "semantic", generator_version=edge["generator"]["version"]
+                    )
                 _, _, current_input = build_cache[marker]
                 if current_input != edge["generator"]["input_fingerprint"]:
                     issues.append("semantic adjacency inputs changed")

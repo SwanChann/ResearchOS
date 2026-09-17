@@ -226,12 +226,19 @@ class CorpusStore:
         validate_record("corpus", record)
         if record["id"] != corpus_id:
             raise ResearchFlowError(f"Corpus ID does not match path: {corpus_id}")
-        return {"record": record, "verification": self.verify(corpus_id)}
+        return {"record": record, "verification": self.verify(corpus_id, record=record)}
 
-    def verify(self, corpus_id: str) -> dict[str, Any]:
-        path = self.folder / f"{corpus_id}.yaml"
-        record = read_yaml(path)
-        validate_record("corpus", record)
+    def verify(
+        self, corpus_id: str, *, record: dict[str, Any] | None = None,
+        cache: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        cache = cache if cache is not None else {}
+        if record is None:
+            path = self.folder / f"{corpus_id}.yaml"
+            record = read_yaml(path)
+            validate_record("corpus", record)
+        if record["id"] != corpus_id:
+            raise ResearchFlowError(f"Corpus ID does not match path: {corpus_id}")
         issues: list[str] = []
         expected = corpus_fingerprint(record["scope"], record["source_matrix"]["sha256"], record["papers"])
         if expected != record["corpus_fingerprint"]:
@@ -240,21 +247,31 @@ class CorpusStore:
         if ids != sorted(set(ids)):
             issues.append("paper IDs must be unique and sorted")
         stale_papers = []
+        paper_sources = cache.setdefault("paper_sources", {})
         for item in record["papers"]:
             try:
-                _, _, current = _paper_source(self.project, item["id"])
+                if item["id"] not in paper_sources:
+                    _, _, current = _paper_source(self.project, item["id"])
+                    paper_sources[item["id"]] = current
+                current = paper_sources[item["id"]]
                 if current.casefold() != item["source_fingerprint"].casefold():
                     stale_papers.append(item["id"])
             except ResearchFlowError:
                 stale_papers.append(item["id"])
         if stale_papers:
             issues.append("paper source changed or is unavailable: " + ", ".join(stale_papers))
+        if "matrix" not in cache:
+            try:
+                matrix = LiteratureMatrixStore(self.project).load()
+                cache["matrix"] = (matrix["id"], matrix_fingerprint(matrix))
+            except ResearchFlowError:
+                cache["matrix"] = None
         matrix_current = None
-        try:
-            matrix = LiteratureMatrixStore(self.project).load()
-            if matrix["id"] == record["source_matrix"]["id"]:
-                matrix_current = matrix_fingerprint(matrix) == record["source_matrix"]["sha256"]
-        except ResearchFlowError:
+        if cache["matrix"] is not None:
+            matrix_id, fingerprint = cache["matrix"]
+            if matrix_id == record["source_matrix"]["id"]:
+                matrix_current = fingerprint == record["source_matrix"]["sha256"]
+        else:
             matrix_current = False
         return {
             "corpus_id": corpus_id, "valid": not issues, "issues": issues,
@@ -375,8 +392,12 @@ class CorpusStore:
                 write_yaml(target, candidate)
         return {"corpus_id": corpus_id, "paper_id": paper_id, "review": review, "dry_run": dry_run}
 
-    def extraction_status(self, corpus_id: str) -> dict[str, Any]:
-        corpus = self.show(corpus_id)["record"]
+    def extraction_status(
+        self, corpus_id: str, *, corpus: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        corpus = corpus if corpus is not None else self.show(corpus_id)["record"]
+        if corpus["id"] != corpus_id:
+            raise ResearchFlowError(f"Corpus ID does not match path: {corpus_id}")
         values = []
         for paper in corpus["papers"]:
             path = self.extraction_root / corpus_id / f"{paper['id']}.yaml"
@@ -459,10 +480,13 @@ class CorpusStore:
 
     def summary(self) -> dict[str, Any]:
         corpora = self.list()
+        cache: dict[str, Any] = {}
         return {
             "corpora": len(corpora),
-            "valid": sum(1 for item in corpora if self.verify(item["id"])["valid"]),
-            "complete_and_reviewed": sum(1 for item in corpora if self.extraction_status(item["id"])["complete_and_reviewed"]),
+            "valid": sum(1 for item in corpora if self.verify(item["id"], record=item, cache=cache)["valid"]),
+            "complete_and_reviewed": sum(
+                1 for item in corpora if self.extraction_status(item["id"], corpus=item)["complete_and_reviewed"]
+            ),
         }
 
 

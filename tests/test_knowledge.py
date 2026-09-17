@@ -66,13 +66,25 @@ def test_knowledge_rejects_ambiguous_generated_markers(rf_env):
         knowledge.rebuild()
 
 
-def test_status_uses_registry_and_verbose_exposes_entries(rf_env):
+def test_status_uses_registry_and_verbose_exposes_entries(rf_env, monkeypatch):
     project = _project(rf_env)
     add_observation(project, "TEST observation", "TEST fixture only")
+    original = KnowledgeStore.inventory
+    calls = 0
+
+    def counted(self):
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(KnowledgeStore, "inventory", counted)
     concise = project.status()
+    assert calls == 1
     assert concise["registry_summary"]["records"] == 1
     assert "registry_entries" not in concise
+    calls = 0
     verbose = project.status(verbose=True)
+    assert calls == 1
     assert verbose["registry_entries"][0]["kind"] == "Observation"
     assert verbose["artifact_verification"]["valid"] is True
 

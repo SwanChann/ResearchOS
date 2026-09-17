@@ -458,6 +458,34 @@ def test_semantic_failure_does_not_propagate_on_method_family_alone(rf_env):
     triples = {(item["from"], item["relation"], item["to"]) for item in candidates}
     assert (papers[0], "same_method_family", papers[2]) in triples
     assert (papers[0], "exposes_failure", papers[2]) not in triples
+    assert (papers[0], "boundary_case", papers[2]) in triples
+
+
+def test_semantic_failure_links_an_exact_compared_baseline(rf_env):
+    project, corpus, papers = _semantic_fixture(rf_env)
+    store = PaperAdjacencyStore(project)
+    corpus_record, tuples, _ = store._corpus_inputs(corpus["id"])
+    compared = _v2_tuple(
+        "Method", "method/unrelated", "compared_with", "Method", "method/baseline-nav", 199
+    )
+    compared.update({"id": "TUPLE-test-compared", "paper_id": papers[2], "_extraction_schema_version": 2})
+    candidates = store._semantic_candidates(corpus_record, [*tuples, compared], "0" * 64)
+    triples = {(item["from"], item["relation"], item["to"]) for item in candidates}
+    assert (papers[0], "exposes_failure", papers[2]) in triples
+
+
+def test_false_negative_diagnosis_distinguishes_evidence_from_generator_gaps(rf_env):
+    project, corpus, papers = _semantic_fixture(rf_env)
+    store = PaperAdjacencyStore(project)
+    _, tuples, _ = store._corpus_inputs(corpus["id"])
+    missing = store._miss_diagnosis(
+        {"from": papers[0], "relation": "same_problem", "to": papers[2]}, tuples
+    )
+    actionable = store._miss_diagnosis(
+        {"from": papers[1], "relation": "extends_method", "to": papers[0]}, tuples
+    )
+    assert missing["category"] == "missing_problem_or_task_alignment"
+    assert actionable["category"] == "generator_rule_missing"
 
 
 def test_evaluate_rejects_human_benchmark_that_conflicts_with_accepted_ontology(rf_env):

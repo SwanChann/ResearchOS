@@ -582,14 +582,31 @@ class EvidenceGraphStore:
         if source_kind not in allowed[0] or target_kind not in allowed[1]:
             raise ResearchFlowError(f"Invalid EvidenceGraph endpoints: {source_kind} -[{relation}]-> {target_kind}")
 
-    def _edge_issues(self, edge: dict[str, Any]) -> list[str]:
+    def _edge_issues(
+        self, edge: dict[str, Any], cache: dict[str, Any] | None = None,
+    ) -> list[str]:
+        cache = cache if cache is not None else {}
+        resolved = cache.setdefault("resolved_records", {})
+
+        def resolve(identifier: str) -> dict[str, Any]:
+            if identifier not in resolved:
+                resolved[identifier] = self.resolver.resolve(identifier)
+            return resolved[identifier]
+
+        def exists(identifier: str) -> bool:
+            try:
+                resolve(identifier)
+                return True
+            except ResearchFlowError:
+                return False
+
         issues: list[str] = []
         if edge["from"] == edge["to"]:
             issues.append(f"{edge['id']} is a self-loop")
             return issues
         try:
-            source = self.resolver.resolve(edge["from"])
-            target = self.resolver.resolve(edge["to"])
+            source = resolve(edge["from"])
+            target = resolve(edge["to"])
             self._require_relation(source["kind"], edge["relation"], target["kind"])
         except ResearchFlowError as exc:
             return [f"{edge['id']}: {exc}"]
@@ -599,7 +616,9 @@ class EvidenceGraphStore:
             if edge["source_fingerprints"].get(record["id"]) != record["fingerprint"]:
                 issues.append(f"{edge['id']} is stale at {record['id']}")
         for ref in edge["provenance_refs"]:
-            if not self.resolver.exists(ref):
+            if _prefix(ref) == "PADJ" and source["kind"] == "PAPER" and target["kind"] == "PAPER":
+                continue
+            if not exists(ref):
                 issues.append(f"{edge['id']} has unresolved provenance {ref}")
         relation = edge["relation"]
         if relation == "identifies" and target["data"].get("problem_id") != source["id"]:
@@ -621,8 +640,8 @@ class EvidenceGraphStore:
             run_refs = target["data"].get("evidence", {}).get("refs", [])
             matching = False
             for ref in run_refs:
-                if _prefix(ref) == "RUN" and self.resolver.exists(ref):
-                    run = self.resolver.resolve(ref)["data"]
+                if _prefix(ref) == "RUN" and exists(ref):
+                    run = resolve(ref)["data"]
                     if run.get("experiment") == source["id"] and run.get("status") == "succeeded":
                         matching = True
                         break
@@ -666,9 +685,19 @@ class EvidenceGraphStore:
             if len(adjacency_refs) != 1:
                 issues.append(f"{edge['id']} PAPER relation requires exactly one PADJ provenance record")
             else:
-                shown = PaperAdjacencyStore(self.project).show(adjacency_refs[0])
-                adjacency = shown["edge"]
-                if not shown["usable_for_gap"]:
+                if "adjacency_store" not in cache:
+                    store = PaperAdjacencyStore(self.project)
+                    cache["adjacency_store"] = store
+                    cache["adjacency_edges"] = {item["id"]: item for item in store.load()["edges"]}
+                store = cache["adjacency_store"]
+                adjacency = cache["adjacency_edges"].get(adjacency_refs[0])
+                if adjacency is None:
+                    issues.append(f"{edge['id']} has unresolved provenance {adjacency_refs[0]}")
+                    return issues
+                current, adjacency_issues = store._is_current(
+                    adjacency, cache.setdefault("adjacency_currentness", {})
+                )
+                if not current or adjacency["status"] != "accepted":
                     issues.append(f"{edge['id']} Paper adjacency is not current and human-accepted")
                 if (adjacency["from"], adjacency["relation"], adjacency["to"]) != (
                     edge["from"], edge["relation"], edge["to"]
@@ -680,6 +709,7 @@ class EvidenceGraphStore:
         ledger = self.load()
         issues: list[str] = []
         active_triples: set[tuple[str, str, str]] = set()
+        cache: dict[str, Any] = {}
         for edge in ledger["edges"]:
             if edge["status"] != "active":
                 continue
@@ -687,7 +717,7 @@ class EvidenceGraphStore:
             if triple in active_triples:
                 issues.append(f"Duplicate active edge: {' '.join(triple)}")
             active_triples.add(triple)
-            issues.extend(self._edge_issues(edge))
+            issues.extend(self._edge_issues(edge, cache))
         cycle = self._dependency_cycle(ledger["edges"])
         if cycle:
             issues.append(f"Dependency cycle: {' -> '.join(cycle)}")

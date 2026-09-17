@@ -242,6 +242,7 @@ class ResearchProject:
         decisions = sorted((self.root / "memory" / "decisions").glob("DEC-*.md"))
         from .knowledge import KnowledgeStore
         knowledge = KnowledgeStore(self)
+        knowledge_entries = knowledge.inventory()
         result = {
             "id": self.data["id"], "name": self.data["name"], "repo": str(self.repo),
             "workspace": str(self.root),
@@ -262,8 +263,8 @@ class ResearchProject:
             "last_result": run_events[-1] if run_events else None,
             "latest_decision": decisions[-1].stem if decisions else None,
             "next_action": state.get("Next Action"),
-            "registry_summary": knowledge.summary(),
-            "knowledge_navigation": knowledge.check(),
+            "registry_summary": knowledge.summary(knowledge_entries),
+            "knowledge_navigation": knowledge.check(knowledge_entries),
             "evidence_graph": __import__(
                 "researchflow.evidence_graph", fromlist=["EvidenceGraphStore"]
             ).EvidenceGraphStore(self).summary(),
@@ -276,7 +277,7 @@ class ResearchProject:
             ).PaperAdjacencyStore(self).summary(),
         }
         if verbose:
-            result["registry_entries"] = knowledge.inventory()
+            result["registry_entries"] = knowledge_entries
             result["artifact_verification"] = __import__("researchflow.artifact", fromlist=["ArtifactStore"]).ArtifactStore(self).verify()
         return result
 

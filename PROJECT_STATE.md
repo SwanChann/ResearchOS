@@ -4,9 +4,9 @@
 - durable_goal: Deliver and operate a local-first personal ResearchFlow that supports multiple research topics from evidence retrieval and literature synthesis through hypotheses, experiments, runs, decisions, cross-session continuation, and tested recovery.
 - success_criteria: A researcher can initialize or resume a topic, preserve evidence/provenance, distinguish verification and human review from scientific claims, execute bounded approved experiments, rebuild navigation, and recover durable records without requiring a cloud service.
 - active_workstream: researchflow/paper-adjacency
-- current_milestone: ResearchFlow V0.8.1 source review and local checkpoint are complete; engineering now moves to measured performance and adjacency-recall defects.
-- current_task: Profile read-only `embodied-nav` status/graph/adjacency paths, remove redundant work without changing outputs, then address the four benchmark false negatives through evidence-safe generator changes.
-- status: in_progress
+- current_milestone: ResearchFlow V0.8.2 performance and semantic-v2.2 recall repairs are implemented, verified, and preserved in a local checkpoint.
+- current_task: Publish the authorized checkpoint once a Git remote destination is configured. The two remaining benchmark misses require project-side human evidence decisions, not broader automatic inference.
+- status: awaiting_remote
 
 ## Milestones
 
@@ -27,12 +27,18 @@
 15. [verified] ResearchFlow V0.8.0: Extraction V2 coverage, human-reviewed concept normalization, deterministic semantic candidates, read-only comparison packets, fingerprint-bound human benchmark evaluation, CLI/status/doctor integration, backward compatibility, documentation, isolated wheel install, and the user-authorized local Git checkpoint are complete. No real-project write or push was performed.
 16. [verified/checkpointed] ResearchFlow V0.8.1: source review found no blocking correctness defect; role-aware Method matching, guarded failure propagation, operation-local caching, ontology/benchmark consistency lint, documentation, and 116 tests are included in the local checkpoint.
 17. [verified/application] V0.8.1 was applied to `embodied-nav` through accepted Extraction V2/concepts, semantic adjacency evaluation, six accepted/promoted edges, EvidenceGraph rebuild/check, adjacency-aware `GAP-0006`, human Gap approval, `HYP-0003`, and unexecuted `EXP-0002`. This verifies the research-control workflow through design, not method effectiveness or a scientific result.
-18. [planned] Remaining ResearchFlow engineering focuses on performance, adjacency recall/coverage, Claim-chain usability, experiment-card editing/audit consistency, and a separately authorized real execution-path validation.
+18. [verified/checkpointed] ResearchFlow V0.8.2 performance and recall follow-up: real `embodied-nav` status fell to 39.351-58.796 seconds across two runs; benchmark F1 rose from 0.8333 to 0.9231 with no benchmark false positives; two remaining misses are diagnosed as missing project evidence rather than silently over-inferred.
+19. [planned] Remaining ResearchFlow engineering focuses on Claim-chain usability, experiment-card editing/audit consistency, and a separately authorized real execution-path validation.
 
 ## Verified Facts
 
 - Current verification on 2026-09-17: the V0.8.1 working tree passes all 116 tests, `compileall`, CLI loading, and `git diff --check`. TEST/MOCK results validate software behavior only.
-- ResearchOS V0.8.1 is preserved by a local `main` checkpoint containing the reviewed implementation, tests, documentation, and source-review record. No push or merge occurred.
+- ResearchOS V0.8.1 is preserved by local `main` checkpoint `804f3594a76825bd285dd57bdc53cd6055033d4f`, containing the reviewed implementation, tests, documentation, and source-review record. No push or merge occurred.
+- ResearchOS V0.8.2 is preserved by a subsequent local `main` checkpoint. Publication is pending because the repository has no configured remote or upstream branch.
+- V0.8.2 removes repeated scans across Knowledge, Corpus, EvidenceGraph, and PaperAdjacency. Real `embodied-nav` status measured 39.351 and 58.796 seconds in two runs; component timings from one pass were Knowledge 12.186, EvidenceGraph 17.886, Corpus 4.057, and PaperAdjacency 3.657 seconds.
+- All 118 collected tests pass on the post-checkpoint worktree; `compileall`, CLI loading, and `git diff --check` also pass.
+- Read-only semantic-v2.2 evaluation on the same accepted 24-case benchmark produced TP=12, FP=0, FN=2, TN=10, precision=1.0000, recall=0.8571, and F1=0.9231. The preview has 47 candidates, of which 35 are outside benchmark coverage.
+- The two remaining false negatives are explicitly diagnosed: `PAPER-0028 extends_method PAPER-0004` lacks an explicit accepted `extends` tuple, and `PAPER-0029 same_problem PAPER-0030` lacks accepted Problem/Task alignment. Automatically treating comparison as extension or Method-family overlap as same-problem would exceed the evidence.
 - V0.8.1 uses generator versions `structural-v1.1` and `semantic-v2.1`, so algorithm changes participate in input fingerprints instead of silently reusing old build identity.
 - The current `embodied-nav` authority has advanced through V0.8.1 application: `CORPUS-0008` has 27 accepted V2 extractions, 230 tuples, and 19 accepted concepts. Benchmark v2 has 24 cases; semantic-v2.1 produced TP=10, FP=0, FN=4, TN=10, precision=1.0000, recall=0.7143, and F1=0.8333, with 30 generated candidates outside benchmark coverage.
 - `embodied-nav` currently has six accepted/promoted PaperAdjacency edges, a structurally valid six-edge EvidenceGraph, approved `GAP-0006`, proposed `HYP-0003`, and DRAFT `EXP-0002`; `latest_run` is null and no scientific Claim chain exists.
@@ -78,8 +84,8 @@
 ## Risks And Unknowns
 
 - V0.8.1 is software-verified and field-applied through design, but not validated by a real scientific experiment. The observed adjacency metrics measure only the 24-case benchmark.
-- Semantic-v2.1 still misses four human-positive relations, and 30 generated candidates are outside benchmark coverage; the measured F1 cannot be extrapolated to every generated edge.
-- Full project `status` and graph operations remain minute-scale on the real workspace.
+- Semantic-v2.2 still misses two human-positive relations because current accepted project evidence is insufficient. Thirty-five generated candidates are outside benchmark coverage; the measured F1 cannot be extrapolated to every generated edge.
+- Full project `status` is now tens-of-seconds rather than minute-scale, but the observed 39.351-58.796 seconds remains noticeable for an interactive status command.
 - EvidenceGraph is structurally valid but `ready=false` because no formal Claim chain exists.
 - Lexical packet ranking raises recall but may over-rank generic shared task words or coincidental token overlap. Every proposed pair still requires source-level comparison and a human relation label before it can become `PADJ-*` evidence.
 - The V0.7.0 checkpoint is local only. The wheel smoke test proves package/install behavior, but the generated wheel lives in a temporary directory and is not an off-machine release artifact.
@@ -93,4 +99,4 @@
 
 ## Next Step And User Decision
 
-- This conversation is scoped to ResearchFlow engineering and controlled validation. The active task is performance profiling and adjacency-recall repair using `embodied-nav` read-only. Any continuation of `GAP-0006`, `HYP-0003`, `EXP-0002`, literature reasoning, or embodied-navigation experiment design belongs in the separate `F:\codespace\embodied-nav` project conversation.
+- This conversation is scoped to ResearchFlow engineering and controlled validation. V0.8.2 is checkpointed and push is authorized, but this repository currently has no configured Git remote. The next required input is the destination repository URL and confirmation that it should be named `origin`. Resolving the two remaining benchmark labels requires source review and human-reviewed extraction/concept changes in the separate `F:\codespace\embodied-nav` project conversation; no such project write was performed here.

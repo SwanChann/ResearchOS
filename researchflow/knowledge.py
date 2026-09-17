@@ -127,16 +127,16 @@ class KnowledgeStore:
             entries.append(self._entry(item["id"], item["title"], "Artifact", self.project.root / item["path"], labels))
         return entries
 
-    def summary(self) -> dict[str, Any]:
-        entries = self.inventory()
+    def summary(self, entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        entries = entries if entries is not None else self.inventory()
         counts: dict[str, int] = {}
         for item in entries:
             for label in item["labels"]:
                 counts[label] = counts.get(label, 0) + 1
         return {"records": len(entries), "by_state": counts, "broken_or_stale": [item["id"] for item in entries if {"broken", "stale"} & set(item["labels"])]}
 
-    def generated_block(self) -> str:
-        entries = self.inventory()
+    def generated_block(self, entries: list[dict[str, Any]] | None = None) -> str:
+        entries = entries if entries is not None else self.inventory()
         lines = [BEGIN, "", "## ResearchFlow Generated Index", "", "> Machine-generated navigation. File integrity, contract checks, and review state do not establish scientific claims."]
         order = (
             "Paper", "Corpus", "Problem", "Gap", "Observation", "Hypothesis", "Experiment",
@@ -158,7 +158,8 @@ class KnowledgeStore:
 
     def rebuild(self, *, dry_run: bool = False) -> dict[str, Any]:
         current = self.path.read_text(encoding="utf-8") if self.path.exists() else "# Knowledge Index\n"
-        generated = self.generated_block()
+        entries = self.inventory()
+        generated = self.generated_block(entries)
         match = self._generated_match(current)
         if match:
             updated = current[:match.start()] + generated + current[match.end():]
@@ -170,16 +171,17 @@ class KnowledgeStore:
             atomic_text(self.path, updated)
         return {
             "path": str(self.path), "changed": changed, "dry_run": dry_run,
-            "records": len(self.inventory()), "manual_content_preserved": True,
+            "records": len(entries), "manual_content_preserved": True,
         }
 
-    def check(self) -> dict[str, Any]:
+    def check(self, entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        entries = entries if entries is not None else self.inventory()
         current = self.path.read_text(encoding="utf-8") if self.path.exists() else ""
         match = self._generated_match(current)
-        expected = self.generated_block()
+        expected = self.generated_block(entries)
         actual = match.group(0) if match else None
         stale = actual != expected
-        expected_ids = {item["id"] for item in self.inventory()}
+        expected_ids = {item["id"] for item in entries}
         listed_ids = set(re.findall(
             r"\[(?:((?:PAPER|CORPUS|PROB|GAP|OBS|HYP|EXP|RUN|CLAIM|DEC|LITMATRIX|ARTIFACT)-\d+))\]",
             actual or "",

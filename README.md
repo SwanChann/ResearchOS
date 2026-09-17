@@ -118,7 +118,7 @@ No database is authoritative. Datasets and large checkpoints stay in their confi
 
 ## Problems, Claims, and EvidenceGraph
 
-ResearchFlow 0.8.1 extends RFC-0002 PaperAdjacency with Extraction V2 coverage declarations, a human-reviewed project concept vocabulary, deterministic semantic candidates, ranked comparison packets, and benchmark-scoped adjacency evaluation. Method-family matching is role-aware, failure propagation requires a canonical-method match or additional task/assumption/failure context, and evaluation rejects labels that conflict with an accepted ontology relation. It retains the RFC-0001 CorpusGap + EvidenceGraph foundation. A passing structural or semantic-generator check does not establish semantic validity, novelty, or scientific truth.
+ResearchFlow 0.8.2 extends RFC-0002 PaperAdjacency with Extraction V2 coverage declarations, a human-reviewed project concept vocabulary, deterministic semantic candidates, ranked comparison packets, benchmark-scoped adjacency evaluation, operation-local status caches, and evidence-aware false-negative diagnosis. Method-family matching is role-aware; exact comparison-baseline failures and guarded boundary cases can become review candidates, while missing extension or Problem/Task evidence remains explicit instead of being over-inferred. It retains the RFC-0001 CorpusGap + EvidenceGraph foundation. A passing structural or semantic-generator check does not establish semantic validity, novelty, or scientific truth.
 
 ```powershell
 rf scaffold problem --output .\problem.yaml
@@ -250,4 +250,4 @@ python -m pytest tests/test_e2e_toy.py -q
 - EvidenceGraph has no autonomous repair loop or built-in model provider. L2/L3 results enter through a fingerprint-bound review file, so unavailable review fails closed rather than being treated as a pass.
 - Existing projects remain readable without migration. Real migration is never triggered by `status`, `doctor`, package installation, or schema availability; it requires an explicit dry-run fingerprint and a verified snapshot.
 
-The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, embedding/provider selection, additional deep reads, real-project V2 writes, remote cancellation, and retention automation remain separately authorized workflows and do not block the V0.8.1 local software boundary.
+The current acceptance boundary is the reusable ResearchFlow system, not continued expansion of one topic's paper corpus. External discovery, embedding/provider selection, additional deep reads, real-project V2 writes, remote cancellation, and retention automation remain separately authorized workflows and do not block the V0.8.2 local software boundary.
