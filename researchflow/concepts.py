@@ -31,6 +31,7 @@ class ConceptStore:
     def __init__(self, project):
         self.project = project
         self.path = project.root / CONCEPT_RELATIVE_PATH
+        self._resolve_index: dict[tuple[str, str], dict[str, Any]] | None = None
 
     @staticmethod
     def _empty() -> dict[str, Any]:
@@ -102,6 +103,7 @@ class ConceptStore:
         validate_record("concept_vocabulary", candidate)
         self._validate_integrity(candidate)
         write_yaml(self.path, candidate)
+        self._resolve_index = None
 
     def _normalize_request(self, request_file: Path) -> dict[str, Any]:
         request = read_yaml(request_file.expanduser().resolve())
@@ -220,16 +222,20 @@ class ConceptStore:
         return {"id": concept_id, "review": review, "dry_run": dry_run}
 
     def resolve(self, node_type: str, key: str) -> dict[str, Any]:
-        accepted = [item for item in self.load()["concepts"] if item["status"] == "accepted"]
-        match = next((
-            item for item in accepted
-            if item["type"] == node_type and key in {item["canonical_key"], *item["aliases"]}
-        ), None)
+        if self._resolve_index is None:
+            accepted = [item for item in self.load()["concepts"] if item["status"] == "accepted"]
+            self._resolve_index = {
+                (item["type"], alias): item
+                for item in accepted
+                for alias in (item["canonical_key"], *item["aliases"])
+            }
+        match = self._resolve_index.get((node_type, key))
         if not match:
             return {
                 "type": node_type, "input_key": key, "canonical_key": key,
                 "broader_keys": [], "related_keys": [], "known": False,
             }
+        accepted = [item for item in self._resolve_index.values()]
         by_key = {(item["type"], item["canonical_key"]): item for item in accepted}
         broader = []
         current = match

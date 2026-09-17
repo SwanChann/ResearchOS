@@ -16,8 +16,8 @@ from .schema import validate_record
 
 ADJACENCY_RELATIVE_PATH = Path(".research/paper-adjacency/edges.yaml")
 LOCK_RELATIVE_PATH = Path(".locks/paper-adjacency-write.lock")
-GENERATOR_VERSION = "structural-v1"
-SEMANTIC_GENERATOR_VERSION = "semantic-v2"
+GENERATOR_VERSION = "structural-v1.1"
+SEMANTIC_GENERATOR_VERSION = "semantic-v2.1"
 
 RELATIONS = {
     "same_problem", "same_method_family", "extends_method", "replaces_component",
@@ -26,6 +26,20 @@ RELATIONS = {
     "counterevidence", "boundary_case",
 }
 SYMMETRIC_RELATIONS = {"same_problem", "same_method_family", "shares_assumption", "same_evaluation"}
+METHOD_ADOPTION_ROLES = {
+    ("object", "proposes"),
+    ("subject", "uses_component"),
+    ("subject", "trained_with"),
+    ("subject", "uses_feedback"),
+    ("subject", "evaluated_on"),
+    ("subject", "uses_dataset"),
+    ("subject", "reports_result"),
+    ("subject", "assumes"),
+    ("subject", "requires"),
+    ("subject", "limited_by"),
+    ("subject", "fails_under"),
+    ("subject", "generalizes_to"),
+}
 
 
 def adjacency_fingerprint(edge: dict[str, Any]) -> str:
@@ -103,13 +117,27 @@ class PaperAdjacencyStore:
         return shown["record"], sorted(tuples, key=lambda value: value["id"]), sorted(extraction_fingerprints)
 
     @staticmethod
+    def _is_role_occurrence(item: dict[str, Any], endpoint: str) -> bool:
+        node = item[endpoint]
+        return node["type"] != "Method" or (endpoint, item["relation"]) in METHOD_ADOPTION_ROLES
+
+    @staticmethod
     def _node_occurrences(tuples: list[dict[str, Any]]) -> dict[str, dict[tuple[str, str], list[dict[str, Any]]]]:
         by_paper: dict[str, dict[tuple[str, str], list[dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
         for item in tuples:
             for endpoint in ("subject", "object"):
+                if not PaperAdjacencyStore._is_role_occurrence(item, endpoint):
+                    continue
                 node = item[endpoint]
                 by_paper[item["paper_id"]][(node["type"], node["key"])].append(item)
         return by_paper
+
+    def _paper_analysis_fingerprints(self, paper_ids: list[str]) -> dict[str, str]:
+        result = {}
+        for paper_id in paper_ids:
+            paper = self.project.evidence.show(paper_id)
+            result[paper_id] = canonical_hash({"metadata": paper["metadata"], "body": paper["body"]})
+        return result
 
     @staticmethod
     def _evidence(paper_id: str, tuples: list[dict[str, Any]]) -> dict[str, Any]:
@@ -146,16 +174,13 @@ class PaperAdjacencyStore:
         generator_kind: str = "deterministic_structural",
         generator_version: str = GENERATOR_VERSION,
         semantic_score: float | None = None,
+        paper_fingerprints: dict[str, str] | None = None,
+        vocabulary_fingerprint: str | None = None,
     ) -> dict[str, Any]:
         if relation in SYMMETRIC_RELATIONS and source > target:
             source, target = target, source
             source_tuples, target_tuples = target_tuples, source_tuples
-        fingerprints = {}
-        for paper_id in (source, target):
-            paper = self.project.evidence.show(paper_id)
-            fingerprints[paper_id] = canonical_hash({
-                "metadata": paper["metadata"], "body": paper["body"],
-            })
+        fingerprints = paper_fingerprints or self._paper_analysis_fingerprints([source, target])
         structural = min(1.0, round(0.5 + 0.1 * max(shared_count - 1, 0), 4))
         overall = semantic_score if semantic_score is not None else structural
         edge = {
@@ -186,9 +211,8 @@ class PaperAdjacencyStore:
             "source_fingerprints": {source: fingerprints[source], target: fingerprints[target]},
         }
         if generator_kind == "deterministic_semantic":
-            from .concepts import ConceptStore
             edge["semantic_context"] = {
-                "vocabulary_fingerprint": ConceptStore(self.project).fingerprint(),
+                "vocabulary_fingerprint": vocabulary_fingerprint,
                 "algorithm": generator_version,
             }
         edge["adjacency_fingerprint"] = adjacency_fingerprint(edge)
@@ -199,6 +223,7 @@ class PaperAdjacencyStore:
     ) -> list[dict[str, Any]]:
         occurrences = self._node_occurrences(tuples)
         papers = sorted(occurrences)
+        paper_fingerprints = self._paper_analysis_fingerprints(papers)
         candidates: list[dict[str, Any]] = []
         shared_specs = (
             ("Task", "same_problem", ["problem", "task"]),
@@ -220,6 +245,7 @@ class PaperAdjacencyStore:
                         dimensions=dimensions, source_tuples=source_tuples, target_tuples=target_tuples,
                         rationale=f"Both papers contain the same {node_type} key(s): {', '.join(keys)}.",
                         input_fingerprint=input_fingerprint, shared_count=len(keys), directed=False,
+                        paper_fingerprints=paper_fingerprints,
                     ))
                 evaluation_matches: list[tuple[str, str]] = []
                 for kind, key in set(occurrences[source]) & set(occurrences[target]):
@@ -235,6 +261,7 @@ class PaperAdjacencyStore:
                         dimensions=dimensions, source_tuples=source_tuples, target_tuples=target_tuples,
                         rationale=f"Both papers use the same evaluation key(s): {labels}.",
                         input_fingerprint=input_fingerprint, shared_count=len(evaluation_matches), directed=False,
+                        paper_fingerprints=paper_fingerprints,
                     ))
 
         # Directional failure evidence: one paper reports a Method failing under a
@@ -252,6 +279,7 @@ class PaperAdjacencyStore:
                         target_tuples=occurrences[target][method],
                         rationale=f"{source} reports a failure condition for Method:{method[1]}, which is also used by {target}.",
                         input_fingerprint=input_fingerprint, shared_count=1, directed=True,
+                        paper_fingerprints=paper_fingerprints,
                     ))
 
         unique = {item["adjacency_fingerprint"]: item for item in candidates}
@@ -263,6 +291,7 @@ class PaperAdjacencyStore:
         from .concepts import ConceptStore
 
         concepts = ConceptStore(self.project)
+        vocabulary_fingerprint = concepts.fingerprint()
 
         def normalized(node: dict[str, Any]) -> dict[str, Any]:
             return concepts.resolve(node["type"], node["key"])
@@ -273,6 +302,8 @@ class PaperAdjacencyStore:
         for item in tuples:
             by_paper[item["paper_id"]].append(item)
             for endpoint in ("subject", "object"):
+                if not self._is_role_occurrence(item, endpoint):
+                    continue
                 node = item[endpoint]
                 resolved = normalized(node)
                 occurrences[item["paper_id"]][(node["type"], resolved["canonical_key"])].append(item)
@@ -280,6 +311,7 @@ class PaperAdjacencyStore:
                     broader[item["paper_id"]][(node["type"], key)].append(item)
 
         papers = sorted(by_paper)
+        paper_fingerprints = self._paper_analysis_fingerprints(papers)
         candidates: list[dict[str, Any]] = []
         shared_specs = (
             (("Problem", "Task"), "same_problem", ["problem", "task"]),
@@ -318,6 +350,8 @@ class PaperAdjacencyStore:
                         input_fingerprint=input_fingerprint, shared_count=len(matches), directed=False,
                         generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
                         semantic_score=0.75 if exact else 0.65,
+                        paper_fingerprints=paper_fingerprints,
+                        vocabulary_fingerprint=vocabulary_fingerprint,
                     ))
 
         target_relations = {
@@ -361,36 +395,48 @@ class PaperAdjacencyStore:
                             input_fingerprint=input_fingerprint, shared_count=len(matched), directed=True,
                             generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
                             semantic_score=0.85,
+                            paper_fingerprints=paper_fingerprints,
+                            vocabulary_fingerprint=vocabulary_fingerprint,
                         ))
 
-        # A reported failure condition for a normalized Method can expose a
-        # boundary for another Paper using the same method or method family.
+        # A failure transfers directly to the same adopted canonical Method.
+        # A broader family match is only a candidate when the papers also share
+        # a FailureCondition, Task, or Assumption; family membership alone is
+        # not evidence that a concrete failure applies to another method.
         for source in papers:
             for failure in (item for item in by_paper[source] if item["relation"] == "fails_under"):
                 method = normalized(failure["subject"])
-                keys = {method["canonical_key"], *method["broader_keys"]}
                 for target in papers:
                     if target == source:
                         continue
-                    matched = []
-                    for item in by_paper[target]:
-                        for endpoint in ("subject", "object"):
-                            node = item[endpoint]
-                            if node["type"] != "Method":
-                                continue
-                            other = normalized(node)
-                            if keys & {other["canonical_key"], *other["broader_keys"]}:
-                                matched.append(item)
-                                break
+                    exact_marker = ("Method", method["canonical_key"])
+                    matched = list(occurrences[target].get(exact_marker, []))
+                    context: list[tuple[str, str]] = []
+                    match_basis = "same canonical method"
+                    if not matched:
+                        family_keys = set(method["broader_keys"])
+                        family_markers = [("Method", key) for key in sorted(family_keys)]
+                        matched = [item for marker in family_markers for item in broader[target].get(marker, [])]
+                        context = sorted(
+                            marker for marker in set(occurrences[source]) & set(occurrences[target])
+                            if marker[0] in {"FailureCondition", "Task", "Assumption"}
+                        )
+                        if not matched or not context:
+                            continue
+                        match_basis = "shared broader method family plus " + ", ".join(
+                            f"{kind}:{key}" for kind, key in context
+                        )
                     if matched:
                         candidates.append(self._candidate(
                             corpus=corpus, source=source, relation="exposes_failure", target=target,
                             dimensions=["method", "failure_condition"], source_tuples=[failure],
                             target_tuples=matched,
-                            rationale=f"{source} reports a failure condition for a method family used by {target}.",
+                            rationale=f"{source} reports a failure condition linked to {target} by {match_basis}.",
                             input_fingerprint=input_fingerprint, shared_count=1, directed=True,
                             generator_kind="deterministic_semantic", generator_version=SEMANTIC_GENERATOR_VERSION,
-                            semantic_score=0.8,
+                            semantic_score=0.8 if not context else 0.7,
+                            paper_fingerprints=paper_fingerprints,
+                            vocabulary_fingerprint=vocabulary_fingerprint,
                         ))
 
         # One candidate per semantic triple; merge evidence produced through
@@ -537,6 +583,8 @@ class PaperAdjacencyStore:
         for item in tuples:
             by_paper[item["paper_id"]].append(item)
             for endpoint in ("subject", "object"):
+                if not self._is_role_occurrence(item, endpoint):
+                    continue
                 node = item[endpoint]
                 resolved = concepts.resolve(node["type"], node["key"])
                 profiles[item["paper_id"]][node["type"]].add(resolved["canonical_key"])
@@ -664,6 +712,23 @@ class PaperAdjacencyStore:
             normalized_cases.append((case, marker))
         preview = self.preview(corpus_id, mode=mode)
         predicted = {(item["from"], item["relation"], item["to"]) for item in preview["candidates"]}
+        ontology_relations = {
+            (item["from"], item["relation"], item["to"])
+            for item in preview["candidates"]
+            if item["relation"] in SYMMETRIC_RELATIONS
+            and item["generator"]["kind"] == "deterministic_semantic"
+            and "accepted " in item["rationale"]
+            and " concept" in item["rationale"]
+        }
+        conflicts = [
+            marker for case, marker in normalized_cases
+            if case["expected"] is False and marker in ontology_relations
+        ]
+        if conflicts:
+            labels = ", ".join(f"{source} --{relation}-- {target}" for source, relation, target in conflicts)
+            raise ResearchFlowError(
+                "Adjacency benchmark conflicts with accepted ontology: " + labels
+            )
         tp = fp = fn = tn = 0
         cases = []
         for case, marker in normalized_cases:
@@ -798,14 +863,24 @@ class PaperAdjacencyStore:
             counts[edge["relation"]] = counts.get(edge["relation"], 0) + 1
         return dict(sorted(counts.items()))
 
-    def _is_current(self, edge: dict[str, Any]) -> tuple[bool, list[str]]:
+    def _is_current(
+        self, edge: dict[str, Any], cache: dict[str, Any] | None = None
+    ) -> tuple[bool, list[str]]:
+        cache = cache if cache is not None else {}
+        corpus_cache = cache.setdefault("corpus_inputs", {})
+        paper_cache = cache.setdefault("papers", {})
+        build_cache = cache.setdefault("build_inputs", {})
         issues = []
         try:
-            corpus, tuples, _ = self._corpus_inputs(edge["corpus_id"])
+            if edge["corpus_id"] not in corpus_cache:
+                corpus_cache[edge["corpus_id"]] = self._corpus_inputs(edge["corpus_id"])
+            corpus, tuples, _ = corpus_cache[edge["corpus_id"]]
             papers = {item["id"]: item["source_fingerprint"] for item in corpus["papers"]}
             tuples_by_id = {item["id"]: item for item in tuples}
             for paper_id in (edge["from"], edge["to"]):
-                paper = self.project.evidence.show(paper_id)
+                if paper_id not in paper_cache:
+                    paper_cache[paper_id] = self.project.evidence.show(paper_id)
+                paper = paper_cache[paper_id]
                 document_fingerprint = paper["metadata"].get("source", {}).get("document", {}).get("sha256", "")
                 if papers.get(paper_id, "").casefold() != document_fingerprint.casefold():
                     issues.append(f"Corpus source fingerprint changed for {paper_id}")
@@ -826,11 +901,16 @@ class PaperAdjacencyStore:
         semantic_context = edge.get("semantic_context")
         if semantic_context:
             from .concepts import ConceptStore
-            if semantic_context["vocabulary_fingerprint"] != ConceptStore(self.project).fingerprint():
+            if "vocabulary_fingerprint" not in cache:
+                cache["vocabulary_fingerprint"] = ConceptStore(self.project).fingerprint()
+            if semantic_context["vocabulary_fingerprint"] != cache["vocabulary_fingerprint"]:
                 issues.append("accepted concept vocabulary changed")
         if edge["generator"]["kind"] == "deterministic_semantic":
             try:
-                _, _, current_input = self._build_inputs(edge["corpus_id"], "semantic")
+                marker = (edge["corpus_id"], "semantic")
+                if marker not in build_cache:
+                    build_cache[marker] = self._build_inputs(edge["corpus_id"], "semantic")
+                _, _, current_input = build_cache[marker]
                 if current_input != edge["generator"]["input_fingerprint"]:
                     issues.append("semantic adjacency inputs changed")
             except ResearchFlowError as exc:
@@ -842,8 +922,9 @@ class PaperAdjacencyStore:
 
     def list(self, *, status: str | None = None, corpus_id: str | None = None) -> list[dict[str, Any]]:
         values = []
+        cache: dict[str, Any] = {}
         for edge in self.load()["edges"]:
-            current, issues = self._is_current(edge)
+            current, issues = self._is_current(edge, cache)
             item = {**edge, "current": current, "issues": issues}
             if status and edge["status"] != status:
                 continue
@@ -926,8 +1007,9 @@ class PaperAdjacencyStore:
         ledger = self.load()
         issues = []
         usable = 0
+        cache: dict[str, Any] = {}
         for edge in ledger["edges"]:
-            current, edge_issues = self._is_current(edge)
+            current, edge_issues = self._is_current(edge, cache)
             issues.extend(f"{edge['id']}: {issue}" for issue in edge_issues)
             if current and edge["status"] == "accepted":
                 usable += 1

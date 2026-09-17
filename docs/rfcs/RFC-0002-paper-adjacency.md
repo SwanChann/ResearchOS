@@ -21,7 +21,7 @@ Every edge stores both Paper analysis fingerprints, the Corpus, evidence Claim I
 
 ## 3. Deterministic structural generation
 
-`adjacency build` reads only current human-accepted Corpus extractions. Version `structural-v1` derives:
+`adjacency build` reads only current human-accepted Corpus extractions. Version `structural-v1.1` derives the following relations; Method occurrences are role-aware and exclude prior-work comparison endpoints:
 
 | shared/linked structure | candidate relation |
 |---|---|

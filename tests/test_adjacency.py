@@ -348,7 +348,7 @@ def _semantic_fixture(rf_env) -> tuple[ResearchProject, dict, list[str]]:
             _v2_tuple("Method", "method/baseline-nav", "assumes", "Assumption", "assumption/static-world", 109),
             _v2_tuple("Method", "method/baseline-nav", "limited_by", "Limitation", "limitation/failure-recovery", 110),
             _v2_tuple("Method", "method/baseline-nav", "fails_under", "FailureCondition", "failure/dynamic-obstacle", 111),
-            _v2_tuple("Method", "method/baseline-nav", "compared_with", "Method", "method/prior", 112),
+            _v2_tuple("Method", "method/baseline-nav", "compared_with", "Method", "method/unrelated", 112),
         ],
         [
             _v2_tuple("Paper", "paper/adaptive", "proposes", "Method", "method/adaptive-nav", 121),
@@ -399,9 +399,12 @@ def test_v2_semantic_adjacency_packet_and_evaluation(rf_env):
     structural = store.build(corpus["id"], mode="structural", details=True, dry_run=True)
     semantic = store.build(corpus["id"], mode="semantic", details=True, dry_run=True)
     assert semantic["candidate_count"] > structural["candidate_count"]
+    structural_triples = {(item["from"], item["relation"], item["to"]) for item in structural["candidates"]}
+    assert (papers[0], "same_method_family", papers[2]) not in structural_triples
     triples = {(item["from"], item["relation"], item["to"]) for item in semantic["candidates"]}
     assert (papers[0], "same_problem", papers[1]) in triples
     assert (papers[0], "same_method_family", papers[1]) in triples
+    assert (papers[0], "same_method_family", papers[2]) not in triples
     assert (papers[1], "extends_method", papers[0]) in triples
     assert (papers[1], "addresses_limitation", papers[0]) in triples
 
@@ -440,6 +443,76 @@ def test_v2_semantic_adjacency_packet_and_evaluation(rf_env):
     write_yaml(benchmark, changed)
     with pytest.raises(ResearchFlowError, match="review fingerprint is stale"):
         store.evaluate(corpus["id"], benchmark, mode="semantic")
+
+
+def test_semantic_failure_does_not_propagate_on_method_family_alone(rf_env):
+    project, corpus, papers = _semantic_fixture(rf_env)
+    concepts = project.root / ".research"
+    _add_accepted_concept(project, concepts / "unrelated-method.yaml", {
+        "type": "Method", "canonical_key": "method/unrelated", "label": "TEST unrelated method",
+        "aliases": [], "broader_key": "method/family/agentic-nav", "related_keys": [],
+        "rationale": "TEST method shares a broad family but no task, assumption, or failure condition.",
+        "source": {"kind": "human", "name": "human:test", "version": "TEST-v1"},
+    })
+    candidates = PaperAdjacencyStore(project).preview(corpus["id"], mode="semantic")["candidates"]
+    triples = {(item["from"], item["relation"], item["to"]) for item in candidates}
+    assert (papers[0], "same_method_family", papers[2]) in triples
+    assert (papers[0], "exposes_failure", papers[2]) not in triples
+
+
+def test_evaluate_rejects_human_benchmark_that_conflicts_with_accepted_ontology(rf_env):
+    project, corpus, papers = _semantic_fixture(rf_env)
+    benchmark = project.root / ".research/conflicting-benchmark.yaml"
+    record = {
+        "schema_version": 1, "benchmark_id": "test/conflicting-ontology-v1",
+        "corpus_id": corpus["id"], "corpus_fingerprint": corpus["corpus_fingerprint"],
+        "rationale": "TEST benchmark conflict must fail closed.",
+        "cases": [{
+            "from": papers[0], "relation": "same_method_family", "to": papers[1],
+            "expected": False, "rationale": "TEST label contradicts the accepted broader family.",
+        }],
+    }
+    from researchflow.corpus_gap import canonical_hash
+    record["review"] = {
+        "reviewer": "human:test", "reviewed_fingerprint": canonical_hash(record),
+        "rationale": "TEST review deliberately preserves a conflicting label.",
+        "reviewed_at": "2026-09-16T00:00:00+00:00",
+    }
+    write_yaml(benchmark, record)
+    with pytest.raises(ResearchFlowError, match="conflicts with accepted ontology"):
+        PaperAdjacencyStore(project).evaluate(corpus["id"], benchmark, mode="semantic")
+
+
+def test_semantic_preview_reuses_one_loaded_concept_ledger(rf_env, monkeypatch):
+    project, corpus, _ = _semantic_fixture(rf_env)
+    original = ConceptStore.load
+    calls = 0
+
+    def counted(self):
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(ConceptStore, "load", counted)
+    PaperAdjacencyStore(project).preview(corpus["id"], mode="semantic")
+    assert calls <= 3
+
+
+def test_adjacency_check_reuses_currentness_inputs_across_edges(rf_env, monkeypatch):
+    project, corpus, _ = _semantic_fixture(rf_env)
+    store = PaperAdjacencyStore(project)
+    store.build(corpus["id"], mode="semantic")
+    original = store._corpus_inputs
+    calls = 0
+
+    def counted(corpus_id):
+        nonlocal calls
+        calls += 1
+        return original(corpus_id)
+
+    monkeypatch.setattr(store, "_corpus_inputs", counted)
+    assert store.check()["valid"] is True
+    assert calls <= 2
 
 
 def test_v2_coverage_and_concept_human_gates(rf_env):

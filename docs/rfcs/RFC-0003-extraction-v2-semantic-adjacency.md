@@ -1,6 +1,6 @@
 # RFC-0003: Extraction V2 and semantic PaperAdjacency
 
-Status: implemented locally in ResearchFlow 0.8.0; real-project adoption requires separate authorization.
+Status: implemented locally in ResearchFlow 0.8.1; real-project adoption requires separate authorization.
 
 ## Problem
 
@@ -10,9 +10,9 @@ V1 extraction accepts sparse tuples without recording which literature dimension
 
 1. Extraction V2 adds source-bounded assertions and nine required coverage dispositions: problem, method/components, training, evaluation, results, assumptions, limitations, failure conditions, and prior-work delta.
 2. A project vocabulary stores typed canonical keys, aliases, broader concepts, and related concepts. Only a `human:*` review can accept normalization. Vocabulary edits change a fingerprint and stale dependent semantic edges.
-3. Semantic generation is deterministic over accepted extraction tuples and accepted concepts. It emits candidates for normalized shared dimensions and explicit `extends`, `replaces`, `addresses`, `contradicts`, and `fails_under` tuples. It never accepts an edge.
+3. Semantic generation is deterministic over accepted extraction tuples and accepted concepts. It emits candidates for normalized shared dimensions and explicit `extends`, `replaces`, `addresses`, `contradicts`, and `fails_under` tuples. Method-family matching uses adoption/proposal roles rather than comparison endpoints. Failure propagation requires the same canonical method or a broader-family match plus shared task, assumption, or failure context. It never accepts an edge.
 4. A comparison packet ranks paper pairs using exact and token-overlap recall signals and includes source tuple evidence. It is a reading queue, not an adjacency ledger.
-5. Evaluation consumes a fingerprinted, `human:*`-reviewed benchmark and reports TP/FP/FN/TN, precision, recall, and F1 within that benchmark only.
+5. Evaluation consumes a fingerprinted, `human:*`-reviewed benchmark and reports TP/FP/FN/TN, precision, recall, and F1 within that benchmark only. A negative benchmark label that conflicts with a deterministic accepted-ontology relation fails closed before metrics are reported.
 
 ## Authority and safety
 
