@@ -4,9 +4,9 @@
 - durable_goal: Deliver and operate a local-first personal ResearchFlow that supports multiple research topics from evidence retrieval and literature synthesis through hypotheses, experiments, runs, decisions, cross-session continuation, and tested recovery.
 - success_criteria: A researcher can initialize or resume a topic, preserve evidence/provenance, distinguish verification and human review from scientific claims, execute bounded approved experiments, rebuild navigation, and recover durable records without requiring a cloud service.
 - active_workstream: researchflow/paper-adjacency
-- current_milestone: ResearchFlow V0.8.2 performance and semantic-v2.2 recall repairs are implemented, verified, and preserved in a local checkpoint.
-- current_task: Publish the authorized checkpoint once a Git remote destination is configured. The two remaining benchmark misses require project-side human evidence decisions, not broader automatic inference.
-- status: awaiting_remote
+- current_milestone: ResearchFlow V0.8.2 performance and semantic-v2.2 recall repairs are implemented, verified, locally checkpointed, and published to the public GitHub repository.
+- current_task: The two remaining benchmark misses require project-side human evidence decisions, not broader automatic inference; continued embodied-navigation research belongs in its separate project conversation.
+- status: complete
 
 ## Milestones
 
@@ -34,7 +34,7 @@
 
 - Current verification on 2026-09-17: the V0.8.1 working tree passes all 116 tests, `compileall`, CLI loading, and `git diff --check`. TEST/MOCK results validate software behavior only.
 - ResearchOS V0.8.1 is preserved by local `main` checkpoint `804f3594a76825bd285dd57bdc53cd6055033d4f`, containing the reviewed implementation, tests, documentation, and source-review record. No push or merge occurred.
-- ResearchOS V0.8.2 is preserved by a subsequent local `main` checkpoint. Publication is pending because the repository has no configured remote or upstream branch.
+- ResearchOS V0.8.2 is preserved by local `main` checkpoint `e02f0e84411481a6002f99a2d0677db2ccdf394c` and published to public repository `https://github.com/SwanChann/ResearchOS`; local `main` tracks `origin/main`.
 - V0.8.2 removes repeated scans across Knowledge, Corpus, EvidenceGraph, and PaperAdjacency. Real `embodied-nav` status measured 39.351 and 58.796 seconds in two runs; component timings from one pass were Knowledge 12.186, EvidenceGraph 17.886, Corpus 4.057, and PaperAdjacency 3.657 seconds.
 - All 118 collected tests pass on the post-checkpoint worktree; `compileall`, CLI loading, and `git diff --check` also pass.
 - Read-only semantic-v2.2 evaluation on the same accepted 24-case benchmark produced TP=12, FP=0, FN=2, TN=10, precision=1.0000, recall=0.8571, and F1=0.9231. The preview has 47 candidates, of which 35 are outside benchmark coverage.
@@ -99,4 +99,4 @@
 
 ## Next Step And User Decision
 
-- This conversation is scoped to ResearchFlow engineering and controlled validation. V0.8.2 is checkpointed and push is authorized, but this repository currently has no configured Git remote. The next required input is the destination repository URL and confirmation that it should be named `origin`. Resolving the two remaining benchmark labels requires source review and human-reviewed extraction/concept changes in the separate `F:\codespace\embodied-nav` project conversation; no such project write was performed here.
+- This conversation is scoped to ResearchFlow engineering and controlled validation. V0.8.2 is checkpointed and published to the public `origin` remote. Resolving the two remaining benchmark labels requires source review and human-reviewed extraction/concept changes in the separate `F:\codespace\embodied-nav` project conversation; no such project write was performed here.
